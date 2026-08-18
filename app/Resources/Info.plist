@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Seihitsu</string>
+    <key>CFBundleDisplayName</key>
+    <string>Seihitsu Shirei</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.jarvis.seihitsu</string>
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleExecutable</key>
+    <string>Seihitsu</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Seihitsu verifies its overlay is excluded from screen capture, and later reads on-screen text you permit.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Seihitsu transcribes speech you dictate to it.</string>
+</dict>
+</plist>

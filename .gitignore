@@ -1,0 +1,13 @@
+# Swift / SwiftPM build artifacts
+.build/
+.swiftpm/
+Package.resolved
+
+# Built app bundle (produced by Scripts/bundle.sh)
+*.app/
+
+# Capture self-test / proof output
+captures/
+
+# macOS
+.DS_Store

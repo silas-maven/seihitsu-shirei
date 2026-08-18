@@ -1,0 +1,55 @@
+import Foundation
+
+/// OpenAI Chat Completions (streaming). Covers OpenAI itself and any OpenAI-compatible
+/// endpoint (LM Studio, Ollama, OpenRouter, Groq, ...) via a configurable base URL.
+/// A local endpoint may need no key, so a missing key is allowed when the host is loopback.
+final class OpenAICompatibleBackend: ModelBackend {
+    let id: String
+    let capabilities: Capabilities
+
+    private let model: String
+    private let baseURL: String
+    private let apiKeyAccount: String?
+
+    init(id: String, model: String, baseURL: String, apiKeyAccount: String?, vision: Bool = false) {
+        self.id = id
+        self.model = model
+        self.baseURL = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+        self.apiKeyAccount = apiKeyAccount
+        self.capabilities = Capabilities(streaming: true, agentic: false, sessions: false, vision: vision, tools: false)
+    }
+
+    func send(_ req: Prompt) -> AsyncThrowingStream<Chunk, Error> {
+        guard let url = URL(string: "\(baseURL)/chat/completions") else {
+            return singleMessageStream("[\(id)] Bad base URL: \(baseURL)")
+        }
+        let key = apiKeyAccount.flatMap { Keychain.read(service: "Seihitsu.apikeys", account: $0) }
+        let isLoopback = baseURL.contains("localhost") || baseURL.contains("127.0.0.1")
+        if (key == nil || key?.isEmpty == true) && !isLoopback, let acct = apiKeyAccount {
+            return singleMessageStream("[\(id)] No API key. Add one:\n  security add-generic-password -s Seihitsu.apikeys -a \(acct) -w YOUR_KEY")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let key, !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+
+        let messages: [[String: String]] = [
+            ["role": "system", "content": req.system ?? "You are a concise heads-up assistant. Answer directly in plain text."],
+            ["role": "user", "content": req.wireText()],
+        ]
+        let body: [String: Any] = [
+            "model": req.model ?? model,
+            "stream": true,
+            "messages": messages,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        return SSEStream.run(request) { payload in
+            guard let obj = SSEStream.json(payload),
+                  let choices = obj["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any] else { return nil }
+            return delta["content"] as? String
+        }
+    }
+}
