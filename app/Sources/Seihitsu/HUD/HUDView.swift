@@ -9,13 +9,15 @@ struct HUDView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             promptRow
+            actionRow
             if let ctx = vm.context { ContextChip(attachment: ctx, accent: accent) { vm.clearContext() } }
             Divider().overlay(Color.white.opacity(0.12))
+            answerHeader
             answerArea
             footer
         }
         .padding(16)
-        .frame(width: HUDController.size.width, height: HUDController.size.height, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Glass: faint tint + specular top-lit border over the NSVisualEffectView blur.
         .background(
             RoundedRectangle(cornerRadius: HUDController.corner)
@@ -48,6 +50,42 @@ struct HUDView: View {
         .font(.system(.body, design: .monospaced))
     }
 
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            Button { vm.requestCapture() } label: {
+                Label("Capture", systemImage: "text.viewfinder")
+            }
+            .foregroundStyle(accent)
+            Button { vm.toggleListen() } label: {
+                Label(vm.isListening ? "Stop" : "Listen",
+                      systemImage: vm.isListening ? "stop.circle.fill" : "mic.fill")
+            }
+            .foregroundStyle(vm.isListening ? Color.red : accent)
+            Spacer()
+            if vm.isListening {
+                Circle().fill(Color.red).frame(width: 7, height: 7)
+                Text("rec").foregroundStyle(.red.opacity(0.9))
+            }
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 11, design: .monospaced))
+    }
+
+    private var answerHeader: some View {
+        HStack {
+            Text("ANSWER").font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.35)).tracking(1.2)
+            Spacer()
+            if !vm.answer.isEmpty {
+                Button { vm.copyAnswer() } label: {
+                    Label("Copy", systemImage: "doc.on.doc").font(.system(size: 10, design: .monospaced))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(accent.opacity(0.9))
+            }
+        }
+    }
+
     private var answerArea: some View {
         ScrollView {
             Text(vm.answer.isEmpty ? " " : vm.answer)
@@ -55,6 +93,7 @@ struct HUDView: View {
                 .textSelection(.enabled)
                 .font(.system(.callout, design: .monospaced))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var footer: some View {
@@ -65,7 +104,7 @@ struct HUDView: View {
             }
             Text(vm.statusLine).lineLimit(1)
             Spacer()
-            Text(vm.clickThrough ? "click-through ON" : "⌘⇧Space · ⌘⇧⏎ · ⌘⇧C")
+            Text(vm.clickThrough ? "click-through ON" : "⌥Space · ⌥C · ⌥L")
         }
         .font(.system(size: 10, design: .monospaced))
         .foregroundStyle(.white.opacity(0.5))

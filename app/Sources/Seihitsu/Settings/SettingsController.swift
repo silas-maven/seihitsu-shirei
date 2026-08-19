@@ -17,7 +17,7 @@ final class SettingsController {
             w.title = "Seihitsu Settings"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
-            w.setContentSize(NSSize(width: 480, height: 420))
+            w.setContentSize(NSSize(width: 480, height: 600))
             window = w
         }
         NSApp.activate(ignoringOtherApps: true)

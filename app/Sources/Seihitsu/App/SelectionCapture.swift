@@ -28,11 +28,14 @@ enum SelectionCapture {
     static func capture() -> CapturedSelection? {
         let source = NSWorkspace.shared.frontmostApplication?.localizedName
         if let t = axSelectedText(), !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Log.log("capture: AX selected \(t.count) chars from \(source ?? "?")")
             return classify(t, source: source)
         }
         if let t = syntheticCopy(), !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Log.log("capture: synthetic-copy \(t.count) chars from \(source ?? "?")")
             return classify(t, source: source)
         }
+        Log.log("capture: no fresh selection (AX empty, and Cmd-C produced no new clipboard)")
         return nil
     }
 
@@ -68,7 +71,11 @@ enum SelectionCapture {
 
         var waited = 0
         while pb.changeCount == before && waited < 40 { usleep(10_000); waited += 1 } // up to ~400ms
-        let copied = pb.string(forType: .string)
+
+        // Only trust the copy if the pasteboard actually changed. Otherwise Cmd-C did nothing
+        // (no live selection / focus moved) and reading it would return STALE clipboard content.
+        let didChange = pb.changeCount != before
+        let copied = didChange ? pb.string(forType: .string) : nil
 
         restore(saved, to: pb)
         return copied

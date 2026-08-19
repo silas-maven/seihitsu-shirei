@@ -87,7 +87,7 @@ final class ClaudeCodeBackend: ModelBackend {
         }
     }
 
-    static let defaultSystem = "You are a heads-up assistant shown in a small always-on-top overlay. Answer directly and concisely in plain text. No preamble, no tool use."
+    static var defaultSystem: String { HUDPrompts.system + " Do not use tools." }
 
     /// A minimal environment plus an explicit subscription token, so inherited staging/proxy
     /// auth from a parent process cannot poison the call.

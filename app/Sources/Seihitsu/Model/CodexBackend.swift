@@ -28,7 +28,8 @@ final class CodexBackend: ModelBackend {
                         "-o", tmp]
             let chosen = req.model ?? model
             if !chosen.isEmpty { args.append(contentsOf: ["-m", chosen]) }
-            args.append(req.wireText())
+            // Codex has no separate system channel, so prepend the concise guidance.
+            args.append(HUDPrompts.system + "\n\n" + req.wireText())
             process.arguments = args
             process.environment = ProcessEnv.base()
 

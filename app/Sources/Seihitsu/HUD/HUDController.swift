@@ -6,13 +6,14 @@ import SwiftUI
 final class HUDController {
     var onStateChange: ((GlyphState) -> Void)?
 
-    static let size = NSSize(width: 560, height: 380)
+    static let size = NSSize(width: 620, height: 460)
     static let corner: CGFloat = 20
 
     private let vm: HUDViewModel
     private let panel: HUDPanel
     private let router: ModelRouter
     private var clickThrough = false
+    private var hasPositioned = false   // center only on first show; then keep where the user moved it
 
     init(router: ModelRouter) {
         self.router = router
@@ -39,19 +40,33 @@ final class HUDController {
 
         panel = HUDPanel(contentView: glass)
         vm.onGlyph = { [weak self] g in self?.onStateChange?(g) }
+        // self is fully initialized here, so it is safe to capture.
+        vm.onCaptureRequested = { [weak self] in self?.captureAndRoute() }
     }
 
     // MARK: HUD visibility
 
     func toggle() {
-        if panel.isVisible { panel.orderOut(nil) } else { show() }
+        if panel.isVisible { hide() } else { show() }
     }
 
     func show() {
-        centre()
+        if !hasPositioned { centre(); hasPositioned = true }   // keep the user's position after the first open
         panel.orderFrontRegardless()
         panel.makeKey()
         vm.requestFocus()
+        Log.log("HUD shown (level=floating, key=\(panel.isKeyWindow))")
+    }
+
+    func hide() {
+        panel.orderOut(nil)
+        Log.log("HUD hidden")
+    }
+
+    /// Toggle voice listening (shows the HUD if hidden).
+    func toggleListen() {
+        if !panel.isVisible { show() }
+        vm.toggleListen()
     }
 
     func toggleClickThrough() {
@@ -63,14 +78,29 @@ final class HUDController {
     /// Reflect the active provider name in the HUD (called after a switch).
     func refreshModel() { vm.modelName = router.active.name }
 
+    /// Debug: flip the HUD out of `.none` so it appears in screenshots/screen shares, for
+    /// troubleshooting. Toggling back restores capture exclusion.
+    private var revealed = false
+    func toggleCaptureVisibility() {
+        revealed.toggle()
+        panel.sharingType = revealed ? .readOnly : .none
+        if !panel.isVisible { show() }
+        vm.statusLine = revealed ? "VISIBLE TO CAPTURE (debug) — screenshot now, then toggle off" : "hidden from capture again"
+        Log.log("capture-visibility: \(revealed ? "readOnly (revealed)" : "none (hidden)")")
+    }
+
     // MARK: Selection capture
 
     /// Grab the current selection (in whatever app is frontmost) then act on it. Capture runs
     /// off the main thread because the synthetic-copy fallback briefly waits on the pasteboard.
     func captureAndRoute() {
+        Log.log("capture: triggered; AX trusted=\(SelectionCapture.isTrusted(prompt: false))")
         Task.detached {
             let captured = SelectionCapture.capture()
-            await MainActor.run { [weak self] in self?.route(captured) }
+            await MainActor.run { [weak self] in
+                Log.log("capture: result=\(captured.map { "\($0.text.count) chars code=\($0.looksLikeCode) q=\($0.looksLikeQuestion) src=\($0.source ?? "?")" } ?? "nil")")
+                self?.route(captured)
+            }
         }
     }
 
@@ -78,7 +108,7 @@ final class HUDController {
         show()
         guard let captured else {
             if !SelectionCapture.isTrusted(prompt: true) {
-                vm.answer = "Grant Accessibility to Seihitsu:\nSystem Settings > Privacy & Security > Accessibility.\nThen highlight text and press ⌘⇧Return again."
+                vm.answer = "Grant Accessibility to Seihitsu:\nSystem Settings > Privacy & Security > Accessibility.\nThen highlight text and press ⌥C again."
                 vm.statusLine = "Needs Accessibility permission"
             } else {
                 vm.statusLine = "No text selected."
@@ -87,8 +117,10 @@ final class HUDController {
         }
         if captured.looksLikeQuestion {
             vm.answerCapturedQuestion(captured.text, source: captured.source)
+        } else if captured.looksLikeCode {
+            vm.fixCapturedCode(captured.text, source: captured.source)
         } else {
-            vm.loadContext(captured.text, kind: captured.looksLikeCode ? .code : .selection, source: captured.source)
+            vm.loadContext(captured.text, kind: .selection, source: captured.source)
         }
     }
 

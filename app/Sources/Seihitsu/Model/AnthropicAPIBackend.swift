@@ -32,7 +32,7 @@ final class AnthropicAPIBackend: ModelBackend {
             "stream": true,
             "messages": [["role": "user", "content": req.wireText()]],
         ]
-        body["system"] = req.system ?? "You are a concise heads-up assistant. Answer directly in plain text."
+        body["system"] = req.system ?? HUDPrompts.system
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         return SSEStream.run(request) { payload in

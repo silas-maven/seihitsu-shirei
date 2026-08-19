@@ -9,15 +9,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeys = Hotkeys()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Log.log("launch: Seihitsu starting")
         let router = ModelRouter()
         self.router = router
+        Log.log("launch: active provider=\(router.active.name)")
 
         let hud = HUDController(router: router)
         self.hud = hud
 
         let menuBar = MenuBarController()
         menuBar.onToggleHUD = { [weak hud] in hud?.toggle() }
+        menuBar.onCaptureSelection = { [weak hud] in hud?.captureAndRoute() }
+        menuBar.onListen = { [weak hud] in hud?.toggleListen() }
         menuBar.onRunSelfTest = { [weak hud] in hud?.runCaptureSelfTest() }
+        // Hide the HUD before the auth prompt so it can't float over System Settings.
+        menuBar.onGrantAccessibility = { [weak hud] in
+            hud?.hide()
+            Log.log("accessibility: prompting for trust")
+            SelectionCapture.isTrusted(prompt: true)
+        }
+        menuBar.onRevealLogs = {
+            NSWorkspace.shared.selectFile(Log.fileURL.path,
+                                          inFileViewerRootedAtPath: Log.fileURL.deletingLastPathComponent().path)
+        }
+        menuBar.onToggleReveal = { [weak hud] in hud?.toggleCaptureVisibility() }
         menuBar.onQuit = { NSApp.terminate(nil) }
         menuBar.providerList = { [weak router] in
             guard let router else { return [] }
@@ -27,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             router?.setActive(id)
             hud?.refreshModel()
         }
-        menuBar.onOpenSettings = { [weak self] in self?.settings.show() }
+        menuBar.onOpenSettings = { [weak self] in self?.hud?.hide(); self?.settings.show() }
         menuBar.install()
         self.menuBar = menuBar
 
@@ -46,8 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         hotkeys.onSummon = { [weak hud] in hud?.toggle() }
         hotkeys.onCapture = { [weak hud] in hud?.captureAndRoute() }
+        hotkeys.onListen = { [weak hud] in hud?.toggleListen() }
         hotkeys.onToggleClickThrough = { [weak hud] in hud?.toggleClickThrough() }
         hotkeys.register()
+
+        installMainMenu()
 
         // Debug aid: SEIHITSU_AUTOSHOW=1 opens the HUD on launch (used to exercise the
         // render path headlessly; the HUD itself is excluded from screen capture).
@@ -55,4 +73,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud.show()
         }
     }
+
+    /// Even a menu-bar accessory needs a main menu with an Edit menu, otherwise the standard
+    /// editing shortcuts (Cmd-C / Cmd-V / Cmd-X / Cmd-A / Cmd-Z) do nothing in the HUD.
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        appItem.submenu = appMenu
+        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Seihitsu", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+        let editMenu = NSMenu(title: "Edit")
+        editItem.submenu = editMenu
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func openSettingsFromMenu() { hud?.hide(); settings.show() }
 }

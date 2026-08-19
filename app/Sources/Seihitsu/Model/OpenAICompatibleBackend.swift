@@ -35,12 +35,13 @@ final class OpenAICompatibleBackend: ModelBackend {
         if let key, !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
 
         let messages: [[String: String]] = [
-            ["role": "system", "content": req.system ?? "You are a concise heads-up assistant. Answer directly in plain text."],
+            ["role": "system", "content": req.system ?? HUDPrompts.system],
             ["role": "user", "content": req.wireText()],
         ]
         let body: [String: Any] = [
             "model": req.model ?? model,
             "stream": true,
+            "max_tokens": 1500,
             "messages": messages,
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

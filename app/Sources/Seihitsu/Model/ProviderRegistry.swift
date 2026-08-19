@@ -30,15 +30,22 @@ final class ProviderRegistry {
 
         if let data = try? Data(contentsOf: fileURL),
            let saved = try? JSONDecoder().decode(SavedState.self, from: data), !saved.providers.isEmpty {
-            providers = saved.providers
+            // Merge in any default providers added since this file was written (e.g. OpenRouter),
+            // so upgrades surface new providers without wiping the user's edits.
+            var merged = saved.providers
+            for def in Self.defaults where !merged.contains(where: { $0.id == def.id }) {
+                merged.append(def)
+            }
+            providers = merged
             activeID = saved.activeID
         } else {
             providers = Self.defaults
-            activeID = "claude-code"
+            activeID = Self.defaults.first?.id ?? "openrouter"
         }
         if !providers.contains(where: { $0.id == activeID }) {
-            activeID = providers.first?.id ?? "claude-code"
+            activeID = providers.first?.id ?? "openrouter"
         }
+        save()
     }
 
     func setActive(_ id: String) {
@@ -70,6 +77,9 @@ final class ProviderRegistry {
     }
 
     static let defaults: [Provider] = [
+        Provider(id: "openrouter", name: "OpenRouter (Llama 4 Scout)", kind: .openaiCompatible,
+                 model: "meta-llama/llama-4-scout", baseURL: "https://openrouter.ai/api/v1",
+                 keychainAccount: "openrouter", enabled: true),
         Provider(id: "claude-code", name: "Claude Code (sub)", kind: .claudeCLI, model: "sonnet"),
         Provider(id: "codex", name: "Codex (sub)", kind: .codexCLI, model: ""),
         Provider(id: "local", name: "Local (LM Studio)", kind: .openaiCompatible, model: "local-model",

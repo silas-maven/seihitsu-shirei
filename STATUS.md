@@ -29,6 +29,65 @@ Build plan: `docs/ARCHITECTURE.md`. Decisions: `docs/collab/DECISIONS.md`.
 
 ## Session Log
 
+### 2026-08-19f (claude-2 / Vladimir) - committed + pushed; clean-setup README
+- Hamza: "commit this and push to repo." Committed the full body of uncommitted `app/`
+  work (native HUD, highlight-to-act capture, glass, P2 model layer, Settings +
+  permissions, Listen, reveal toggle, file logging, icon, signing scripts) + STATUS.md on
+  branch `claude/project-familiarization-45fead`; pushed to origin (branch only, not main).
+- Rewrote `README.md` from the scaffold-only stub into a clean setup guide: quick start
+  via `fix-permissions.sh`, why stable signing matters (do NOT delete the cert), hotkey
+  table, features, and troubleshooting (incl. the `tccutil reset Accessibility
+  com.jarvis.seihitsu` cure for the stale-TCC capture failure).
+- No code changes this session. Capture remains the one broken feature, pending Hamza's
+  tccutil reset (a blocked write for the agent).
+
+### 2026-08-19c (claude-2 / Vladimir) - Listen render fix; signing cert deleted
+- Fixed Listen "blinks and stops": removed forced on-device recognition (errors instantly
+  when the model isn't ready); tap now uses hardware inputFormat + validation; logs errors.
+- Capture "feels like copy-paste": resolved by the Accessibility grant (⌥C auto-copies the
+  selection). One function, no code change.
+- **Signing cert was deleted** (removing the "duplicate" removed the only identity) -> builds
+  fell back to ad-hoc -> permissions reset. Stopped rebuilding. Added `Scripts/fix-permissions.sh`
+  (one-shot: recreate cert + rebuild stable + relaunch). Hamza must run it once on wake.
+
+### 2026-08-19b (claude-2 / Vladimir) - Listen-stop fix + stable signing
+- Fixed Listen not stopping (deterministic teardown in SpeechListener.stop + VM resets
+  isListening). Fixed stale ⌘⇧Return message -> ⌥C.
+- Root-caused permission re-prompts = ad-hoc signing (code hash changes each rebuild ->
+  TCC forgets grants). Added `Scripts/setup-signing.sh` (self-signed identity; Hamza runs
+  it - keychain writes are blocked for the agent). `bundle.sh` uses it when present.
+
+### 2026-08-19 (claude-2 / Vladimir) - capture clipboard bug, reveal toggle, icon
+- Fixed capture returning STALE clipboard when Cmd-C copied nothing (now checks
+  `pb.changeCount`). Added capture-tier logging.
+- Added "Reveal HUD in Screenshots (debug)" menu toggle (.none <-> .readOnly) for
+  troubleshooting.
+- Swapped in Hamza's own icon (purple Rinnegan) at `Resources/AppIcon-source.png`.
+
+### 2026-08-18 late (claude-2 / Vladimir) - voice, HUD buttons, recenter fix
+- Fixed HUD snapping back to center on capture (now centers only on first open).
+- Added Capture + Listen buttons in the HUD + ⌥L shortcut + menu item.
+- Voice input: `App/SpeechListener.swift` (Apple on-device Speech). Speak -> transcript ->
+  auto-submit. Needs Mic + Speech Recognition perms.
+- Icon swap is now a one-file drop: replace `Resources/AppIcon-source.png`, rerun bundle.sh.
+
+### 2026-08-18 eve (claude-2 / Vladimir) - stickiness, logging, icon
+- HUD window level `.screenSaver` -> `.floating` (was blocking the menu bar + System
+  Settings; that's why auth required hiding the HUD). Esc dismisses; Settings/Grant hide
+  the HUD first.
+- File logger at ~/Library/Logs/Seihitsu/seihitsu.log (menu "Reveal Logs"). Confirmed all
+  3 hotkeys register and ⌥C fires - the capture failure was the missing Accessibility grant.
+- App icon via Higgsfield -> Resources/AppIcon.icns, wired into the bundle.
+
+### 2026-08-18 pm (claude-2 / Vladimir) - real-use feedback pass
+- Fixed copy/paste (accessory app needs an Edit menu; added NSApp.mainMenu) + Copy button.
+- Added OpenRouter provider (llama-4-scout), made it default; registry now merges new
+  default providers into saved state. Settings gained an OpenRouter field + Permissions panel.
+- Hotkeys -> Option-based (⌥Space / ⌥C / ⌥⇧C) + menu-bar fallbacks (Capture, Grant
+  Accessibility). Highlight-to-act: code auto-fixes, questions auto-answer.
+- Concise output (shared system prompt + max_tokens). HUD now resizable + larger.
+- bundle.sh installs to ~/Applications (Spotlight "Seihitsu"). Installed + running.
+
 ### 2026-08-16 to 18 (claude-2 / Vladimir)
 - Proved capture-exclusion (`proof/capture-exclusion/`).
 - Locked decisions: all-Swift single app; Claude Code CLI first backend.

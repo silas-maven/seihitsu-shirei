@@ -4,8 +4,13 @@ import AppKit
 /// switches the active provider.
 final class MenuBarController: NSObject {
     var onToggleHUD: (() -> Void)?
+    var onCaptureSelection: (() -> Void)?
+    var onListen: (() -> Void)?
     var onRunSelfTest: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onGrantAccessibility: (() -> Void)?
+    var onRevealLogs: (() -> Void)?
+    var onToggleReveal: (() -> Void)?
     var onQuit: (() -> Void)?
 
     /// Provider list + selection, supplied by the router.
@@ -21,15 +26,20 @@ final class MenuBarController: NSObject {
         applyGlyph(.idle)
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Show / Hide HUD", action: #selector(toggleHUD), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Show / Hide HUD  (⌥Space)", action: #selector(toggleHUD), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Capture selection  (⌥C)", action: #selector(captureSelection), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Listen  (⌥L)", action: #selector(listen), keyEquivalent: "").target = self
 
         let modelItem = NSMenuItem(title: "Model", action: nil, keyEquivalent: "")
         modelItem.submenu = modelMenu
         menu.addItem(modelItem)
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Grant Accessibility…", action: #selector(grantAccessibility), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Run capture self-test", action: #selector(runSelfTest), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Reveal Logs in Finder", action: #selector(revealLogs), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Reveal HUD in Screenshots (debug)", action: #selector(toggleReveal), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Seihitsu", action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = menu
@@ -69,8 +79,13 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func toggleHUD() { onToggleHUD?() }
+    @objc private func captureSelection() { onCaptureSelection?() }
+    @objc private func listen() { onListen?() }
     @objc private func runSelfTest() { onRunSelfTest?() }
     @objc private func openSettings() { onOpenSettings?() }
+    @objc private func grantAccessibility() { onGrantAccessibility?() }
+    @objc private func revealLogs() { onRevealLogs?() }
+    @objc private func toggleReveal() { onToggleReveal?() }
     @objc private func quit() { onQuit?() }
     @objc private func selectProvider(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }

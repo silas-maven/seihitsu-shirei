@@ -14,6 +14,8 @@
     <string>0.1.0</string>
     <key>CFBundleExecutable</key>
     <string>Seihitsu</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
@@ -26,5 +28,7 @@
     <string>Seihitsu verifies its overlay is excluded from screen capture, and later reads on-screen text you permit.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Seihitsu transcribes speech you dictate to it.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Seihitsu turns your spoken questions into text on-device.</string>
 </dict>
 </plist>
