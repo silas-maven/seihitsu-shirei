@@ -15,6 +15,9 @@ struct Prompt {
     var attachments: [Attachment] = []
     var system: String? = nil
     var model: String? = nil
+    /// Hard cap on output tokens. nil = the backend's own default. Lowered in Brief/Blitz so a
+    /// timed answer completes fast.
+    var maxTokens: Int? = nil
 
     /// The text actually sent to the model: attachment blocks first, then the instruction.
     /// A bare question (no attachments) passes through unchanged.
@@ -23,7 +26,12 @@ struct Prompt {
         var parts: [String] = []
         for a in attachments {
             let src = a.source.map { " from \($0)" } ?? ""
-            let header = (a.kind == .code) ? "Highlighted code\(src):" : "Highlighted text\(src):"
+            let header: String
+            switch a.kind {
+            case .code:       header = "Highlighted code\(src):"
+            case .screenText: header = "Text read from the screen\(src):"
+            case .selection:  header = "Highlighted text\(src):"
+            }
             parts.append("\(header)\n\"\"\"\n\(a.content)\n\"\"\"")
         }
         if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

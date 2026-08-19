@@ -29,6 +29,37 @@ Build plan: `docs/ARCHITECTURE.md`. Decisions: `docs/collab/DECISIONS.md`.
 
 ## Session Log
 
+### 2026-08-19h (claude-2 / Vladimir) - answer speed control (Full/Brief/Blitz)
+- Added a 3-level speed control for timed questions: **Full** (default, ~1500 tok),
+  **Brief** (one to two lines, 220 tok), **Blitz** (answer only, 40 tok; for MCQ just the
+  option). Each level sets a terser system prompt AND a hard output-token cap, so Blitz
+  finishes fast and returns only the answer.
+- `AnswerMode` in `HUDPrompts.swift` (system + maxTokens per level); `Prompt.maxTokens` added
+  and honoured by all HTTP backends (OpenAI-compatible/Anthropic/Gemini) via `req.maxTokens ??`;
+  Codex now respects `req.system`. Injected centrally in `HUDViewModel.run()` so every path
+  (typed, ⌥C, ⌥V) obeys the mode. Persisted in UserDefaults.
+- UI: segmented Full/Brief/Blitz control in the HUD action row (bolt glyph on Blitz);
+  hotkey **⌥⇧S** cycles it (hotkey id 6); **menu-bar "Speed" submenu** with checkmarks
+  (rebuilt on open via NSMenuDelegate so it stays in sync with the HUD control and hotkey).
+  Built clean, stable-signed, relaunched; all 6 hotkeys register. NOT committed.
+
+### 2026-08-19g (claude-2 / Vladimir) - screen-read mode (OCR), ⌥V
+- Added a screen-reading capture path for apps that block copy/select (terminals, Electron,
+  remote desktops) AND as a way around the broken Accessibility grant: it screenshots a
+  region -> on-device Apple Vision OCR -> feeds the text to the active model with an
+  "answer the question shown" instruction. Uses **Screen Recording** permission (distinct
+  from Accessibility). Nothing written to disk; only recognised text is sent.
+- New files: `App/ScreenReader.swift` (SCK capture + crop + Vision OCR), `App/RegionPicker.swift`
+  (drag-to-set overlay), `App/ScreenRegionStore.swift` (region persisted in UserDefaults).
+- Wiring: hotkey ⌥V (id 5), HUD "Read" button (eye), menu items "Read screen (⌥V)",
+  "Set screen region…", "Clear screen region". `Attachment.screenText` now has its own wire
+  header + `HUDPrompts.answerScreen`. The HUD is `.none` so it is excluded from its own capture.
+- User can predefine the read area by dragging a rectangle once; ⌥V reads exactly that. No
+  region set = reads the whole main display. Multi-display: main display only for now.
+- Built clean, bundled (stable-signed, cert intact), installed to ~/Applications, relaunched.
+  All 5 hotkeys register. NOT committed (awaiting Hamza's "commit"). Needs Screen Recording
+  granted once (⌥V will prompt).
+
 ### 2026-08-19f (claude-2 / Vladimir) - committed + pushed; clean-setup README
 - Hamza: "commit this and push to repo." Committed the full body of uncommitted `app/`
   work (native HUD, highlight-to-act capture, glass, P2 model layer, Settings +

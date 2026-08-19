@@ -28,7 +28,7 @@ final class AnthropicAPIBackend: ModelBackend {
 
         var body: [String: Any] = [
             "model": req.model ?? model,
-            "max_tokens": maxTokens,
+            "max_tokens": req.maxTokens ?? maxTokens,
             "stream": true,
             "messages": [["role": "user", "content": req.wireText()]],
         ]

@@ -56,6 +56,10 @@ struct HUDView: View {
                 Label("Capture", systemImage: "text.viewfinder")
             }
             .foregroundStyle(accent)
+            Button { vm.requestReadScreen() } label: {
+                Label("Read", systemImage: "eye")
+            }
+            .foregroundStyle(accent)
             Button { vm.toggleListen() } label: {
                 Label(vm.isListening ? "Stop" : "Listen",
                       systemImage: vm.isListening ? "stop.circle.fill" : "mic.fill")
@@ -66,9 +70,33 @@ struct HUDView: View {
                 Circle().fill(Color.red).frame(width: 7, height: 7)
                 Text("rec").foregroundStyle(.red.opacity(0.9))
             }
+            speedControl
         }
         .buttonStyle(.plain)
         .font(.system(size: 11, design: .monospaced))
+    }
+
+    /// Answer length/speed. Blitz returns just the answer, for a question with a timer.
+    private var speedControl: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 8))
+                .foregroundStyle(vm.mode == .blitz ? accent : .white.opacity(0.3))
+            ForEach(AnswerMode.allCases, id: \.self) { m in
+                Text(m.label)
+                    .font(.system(size: 10, weight: vm.mode == m ? .bold : .regular, design: .monospaced))
+                    .foregroundStyle(vm.mode == m ? accent : .white.opacity(0.4))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(vm.mode == m ? accent.opacity(0.15) : .clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { vm.mode = m }
+            }
+        }
+        .help("Answer length. Blitz returns just the answer for timed questions (⌥⇧S to cycle).")
     }
 
     private var answerHeader: some View {
@@ -104,7 +132,7 @@ struct HUDView: View {
             }
             Text(vm.statusLine).lineLimit(1)
             Spacer()
-            Text(vm.clickThrough ? "click-through ON" : "⌥Space · ⌥C · ⌥L")
+            Text(vm.clickThrough ? "click-through ON" : "⌥Space · ⌥C · ⌥V · ⌥L")
         }
         .font(.system(size: 10, design: .monospaced))
         .foregroundStyle(.white.opacity(0.5))

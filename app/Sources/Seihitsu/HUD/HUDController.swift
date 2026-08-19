@@ -12,6 +12,7 @@ final class HUDController {
     private let vm: HUDViewModel
     private let panel: HUDPanel
     private let router: ModelRouter
+    private let picker = RegionPicker()
     private var clickThrough = false
     private var hasPositioned = false   // center only on first show; then keep where the user moved it
 
@@ -42,6 +43,7 @@ final class HUDController {
         vm.onGlyph = { [weak self] g in self?.onStateChange?(g) }
         // self is fully initialized here, so it is safe to capture.
         vm.onCaptureRequested = { [weak self] in self?.captureAndRoute() }
+        vm.onReadScreenRequested = { [weak self] in self?.readScreenAndRoute() }
     }
 
     // MARK: HUD visibility
@@ -77,6 +79,22 @@ final class HUDController {
 
     /// Reflect the active provider name in the HUD (called after a switch).
     func refreshModel() { vm.modelName = router.active.name }
+
+    /// Cycle answer speed (Full / Brief / Blitz). Shows the HUD so the change is visible.
+    func cycleSpeed() {
+        if !panel.isVisible { show() }
+        vm.cycleMode()
+    }
+
+    /// Current answer-speed mode (raw value), for the menu-bar Speed submenu.
+    var currentModeRaw: String { vm.mode.rawValue }
+
+    /// Set the answer-speed mode from the menu (no HUD popup).
+    func setMode(_ raw: String) {
+        guard let m = AnswerMode(rawValue: raw) else { return }
+        vm.mode = m
+        vm.statusLine = "Speed: \(m.label)"
+    }
 
     /// Debug: flip the HUD out of `.none` so it appears in screenshots/screen shares, for
     /// troubleshooting. Toggling back restores capture exclusion.
@@ -122,6 +140,58 @@ final class HUDController {
         } else {
             vm.loadContext(captured.text, kind: .selection, source: captured.source)
         }
+    }
+
+    // MARK: Screen reading (OCR)
+
+    /// Screenshot the saved region, OCR it, and answer the question it contains. Works in apps
+    /// that block text selection, and uses Screen Recording (not Accessibility).
+    func readScreenAndRoute() {
+        show()
+        guard ScreenReader.ensurePermission() else {
+            vm.answer = "Grant Screen Recording to Seihitsu:\nSystem Settings > Privacy & Security > Screen Recording.\nThen relaunch and press ⌥V."
+            vm.statusLine = "Needs Screen Recording permission"
+            Log.log("screen-read: blocked, no Screen Recording permission")
+            return
+        }
+        let region = ScreenRegionStore.region
+        vm.beginScreenRead(region: ScreenRegionStore.describe)
+        Log.log("screen-read: triggered; region=\(ScreenRegionStore.describe)")
+        Task { @MainActor in
+            let text = await ScreenReader.read(region: region)
+            if let text {
+                Log.log("screen-read: OCR \(text.count) chars")
+                vm.answerScreenText(text, source: nil)
+            } else {
+                Log.log("screen-read: no readable text")
+                vm.screenReadEmpty()
+            }
+        }
+    }
+
+    /// Let the user drag out the area Seihitsu reads. Saved and reused by ⌥V. Cancelling (Esc)
+    /// leaves the current region unchanged.
+    func pickRegion() {
+        hide()
+        picker.present { [weak self] rect in
+            guard let self else { return }
+            self.show()
+            if let rect {
+                ScreenRegionStore.region = rect
+                self.vm.statusLine = "Screen region set: \(ScreenRegionStore.describe)"
+                Log.log("screen-read: region set to \(ScreenRegionStore.describe)")
+            } else {
+                self.vm.statusLine = "Region unchanged (\(ScreenRegionStore.describe))"
+            }
+        }
+    }
+
+    /// Clear the saved region so ⌥V reads the whole display again.
+    func clearRegion() {
+        ScreenRegionStore.region = nil
+        if !panel.isVisible { show() }
+        vm.statusLine = "Screen region cleared (reads full screen)"
+        Log.log("screen-read: region cleared")
     }
 
     // MARK: Self-test

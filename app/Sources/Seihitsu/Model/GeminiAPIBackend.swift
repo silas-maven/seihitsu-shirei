@@ -29,7 +29,7 @@ final class GeminiAPIBackend: ModelBackend {
 
         var body: [String: Any] = [
             "contents": [["role": "user", "parts": [["text": req.wireText()]]]],
-            "generationConfig": ["maxOutputTokens": 1500],
+            "generationConfig": ["maxOutputTokens": req.maxTokens ?? 1500],
         ]
         body["systemInstruction"] = ["parts": [["text": req.system ?? HUDPrompts.system]]]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

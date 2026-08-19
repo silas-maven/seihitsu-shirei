@@ -5,13 +5,17 @@ import Carbon.HIToolbox
 /// Accessibility or Input Monitoring permission (unlike a CGEventTap).
 ///   Option-Space : summon / hide the HUD
 ///   Option-C     : capture the current selection and act on it
+///   Option-V     : read the saved screen region (OCR) and answer it
 ///   Option-L     : start / stop voice listening
 ///   Option-Shift-C : toggle click-through
+///   Option-Shift-S : cycle answer speed (Full / Brief / Blitz)
 final class Hotkeys {
     var onSummon: (() -> Void)?
     var onCapture: (() -> Void)?
+    var onReadScreen: (() -> Void)?
     var onListen: (() -> Void)?
     var onToggleClickThrough: (() -> Void)?
+    var onCycleSpeed: (() -> Void)?
 
     private var eventHandler: EventHandlerRef?
     private var refs: [EventHotKeyRef?] = []
@@ -38,6 +42,8 @@ final class Hotkeys {
         add(id: 2, keyCode: UInt32(kVK_ANSI_C), mods: UInt32(optionKey)) { [weak self] in self?.onCapture?() }
         add(id: 3, keyCode: UInt32(kVK_ANSI_C), mods: UInt32(optionKey | shiftKey)) { [weak self] in self?.onToggleClickThrough?() }
         add(id: 4, keyCode: UInt32(kVK_ANSI_L), mods: UInt32(optionKey)) { [weak self] in self?.onListen?() }
+        add(id: 5, keyCode: UInt32(kVK_ANSI_V), mods: UInt32(optionKey)) { [weak self] in self?.onReadScreen?() }
+        add(id: 6, keyCode: UInt32(kVK_ANSI_S), mods: UInt32(optionKey | shiftKey)) { [weak self] in self?.onCycleSpeed?() }
     }
 
     private func add(id: UInt32, keyCode: UInt32, mods: UInt32, action: @escaping () -> Void) {

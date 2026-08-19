@@ -19,18 +19,39 @@ final class HUDViewModel: ObservableObject {
     @Published var modelName = ""
     /// True while the microphone is capturing for speech-to-text.
     @Published var isListening = false
+    /// Answer length/speed. Blitz caps output hard for timed questions. Persisted.
+    @Published var mode: AnswerMode = .full { didSet { Self.saveMode(mode) } }
+
+    private static let modeKey = "Seihitsu.answerMode"
+    private static func saveMode(_ m: AnswerMode) { UserDefaults.standard.set(m.rawValue, forKey: modeKey) }
+    private static func loadMode() -> AnswerMode {
+        AnswerMode(rawValue: UserDefaults.standard.string(forKey: modeKey) ?? "") ?? .full
+    }
+
+    /// Step Full -> Brief -> Blitz -> Full. Bound to ⌥⇧S.
+    func cycleMode() {
+        let all = AnswerMode.allCases
+        if let i = all.firstIndex(of: mode) { mode = all[(i + 1) % all.count] }
+        statusLine = "Speed: \(mode.label)"
+    }
 
     var onGlyph: ((GlyphState) -> Void)?
     /// Set by the controller; the Capture button forwards to it (capture reads the frontmost
     /// app's selection, which the controller owns).
     var onCaptureRequested: (() -> Void)?
     func requestCapture() { onCaptureRequested?() }
+    /// Set by the controller; the Read button forwards to it (OCR the saved screen region).
+    var onReadScreenRequested: (() -> Void)?
+    func requestReadScreen() { onReadScreenRequested?() }
 
     private let resolveBackend: () -> ModelBackend
     private let listener = SpeechListener()
     private var task: Task<Void, Never>?
 
-    init(resolveBackend: @escaping () -> ModelBackend) { self.resolveBackend = resolveBackend }
+    init(resolveBackend: @escaping () -> ModelBackend) {
+        self.resolveBackend = resolveBackend
+        self.mode = Self.loadMode()
+    }
 
     // MARK: Listen (voice)
 
@@ -93,6 +114,35 @@ final class HUDViewModel: ObservableObject {
         statusLine = "Answering highlighted question…"
     }
 
+    // MARK: Screen reading (OCR)
+
+    /// Show a "reading" state while the region is captured and OCR'd.
+    func beginScreenRead(region: String) {
+        answer = ""
+        prompt = ""
+        context = nil
+        state = .thinking
+        statusLine = "Reading \(region)…"
+        onGlyph?(.thinking)
+    }
+
+    /// OCR'd text is answered immediately, with the "just answer the question shown" instruction.
+    func answerScreenText(_ text: String, source: String?) {
+        context = nil
+        prompt = ""
+        let att = Attachment(kind: .screenText, content: text, source: source)
+        run(Prompt(text: HUDPrompts.answerScreen, attachments: [att]))
+        statusLine = "Answering from screen…"
+    }
+
+    /// Nothing readable was found in the capture region.
+    func screenReadEmpty() {
+        state = .idle
+        statusLine = "No readable text in that region"
+        answer = "Nothing readable found in the capture region.\nUse 'Set screen region' in the menu to point it at the text, then press ⌥V."
+        onGlyph?(.idle)
+    }
+
     /// Highlighted code is fixed immediately with a concise default instruction.
     func fixCapturedCode(_ code: String, source: String?) {
         let att = Attachment(kind: .code, content: code, source: source)
@@ -129,10 +179,15 @@ final class HUDViewModel: ObservableObject {
         run(req)
     }
 
-    private func run(_ req: Prompt) {
+    private func run(_ reqIn: Prompt) {
+        // Apply the active speed mode unless the caller set these explicitly.
+        var req = reqIn
+        if req.system == nil { req.system = mode.system }
+        if req.maxTokens == nil { req.maxTokens = mode.maxTokens }
+
         answer = ""
         state = .thinking
-        statusLine = "Thinking…"
+        statusLine = mode == .full ? "Thinking…" : "Thinking… (\(mode.label))"
         onGlyph?(.thinking)
         let backend = resolveBackend()
         let started = Date()

@@ -41,7 +41,7 @@ final class OpenAICompatibleBackend: ModelBackend {
         let body: [String: Any] = [
             "model": req.model ?? model,
             "stream": true,
-            "max_tokens": 1500,
+            "max_tokens": req.maxTokens ?? 1500,
             "messages": messages,
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

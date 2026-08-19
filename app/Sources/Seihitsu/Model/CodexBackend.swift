@@ -28,8 +28,9 @@ final class CodexBackend: ModelBackend {
                         "-o", tmp]
             let chosen = req.model ?? model
             if !chosen.isEmpty { args.append(contentsOf: ["-m", chosen]) }
-            // Codex has no separate system channel, so prepend the concise guidance.
-            args.append(HUDPrompts.system + "\n\n" + req.wireText())
+            // Codex has no separate system channel, so prepend the concise guidance (the
+            // active speed mode's system prompt when set, else the default).
+            args.append((req.system ?? HUDPrompts.system) + "\n\n" + req.wireText())
             process.arguments = args
             process.environment = ProcessEnv.base()
 
