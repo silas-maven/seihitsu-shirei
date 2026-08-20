@@ -18,6 +18,9 @@ struct Prompt {
     /// Hard cap on output tokens. nil = the backend's own default. Lowered in Brief/Blitz so a
     /// timed answer completes fast.
     var maxTokens: Int? = nil
+    /// A screenshot (JPEG) to send alongside the text, for the vision path (⌥⇧V). Only backends
+    /// whose `capabilities.vision` is true accept it.
+    var imageData: Data? = nil
 
     /// The text actually sent to the model: attachment blocks first, then the instruction.
     /// A bare question (no attachments) passes through unchanged.

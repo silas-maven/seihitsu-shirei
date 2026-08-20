@@ -60,12 +60,20 @@ struct HUDView: View {
                 Label("Read", systemImage: "eye")
             }
             .foregroundStyle(accent)
+            Button { vm.requestSeeScreen() } label: {
+                Label("See", systemImage: "photo")
+            }
+            .foregroundStyle(accent)
             Button { vm.toggleListen() } label: {
                 Label(vm.isListening ? "Stop" : "Listen",
                       systemImage: vm.isListening ? "stop.circle.fill" : "mic.fill")
             }
             .foregroundStyle(vm.isListening ? Color.red : accent)
             Spacer()
+            if vm.autoReading {
+                Circle().fill(accent).frame(width: 7, height: 7)
+                Text("AUTO").foregroundStyle(accent.opacity(0.9)).tracking(0.5)
+            }
             if vm.isListening {
                 Circle().fill(Color.red).frame(width: 7, height: 7)
                 Text("rec").foregroundStyle(.red.opacity(0.9))

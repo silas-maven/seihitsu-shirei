@@ -6,6 +6,8 @@ import Carbon.HIToolbox
 ///   Option-Space : summon / hide the HUD
 ///   Option-C     : capture the current selection and act on it
 ///   Option-V     : read the saved screen region (OCR) and answer it
+///   Option-A     : toggle auto-read (watch the region, answer new questions)
+///   Option-Shift-V : "see" the region as an image, send to a vision model
 ///   Option-L     : start / stop voice listening
 ///   Option-Shift-C : toggle click-through
 ///   Option-Shift-S : cycle answer speed (Full / Brief / Blitz)
@@ -13,6 +15,8 @@ final class Hotkeys {
     var onSummon: (() -> Void)?
     var onCapture: (() -> Void)?
     var onReadScreen: (() -> Void)?
+    var onSeeScreen: (() -> Void)?
+    var onAutoRead: (() -> Void)?
     var onListen: (() -> Void)?
     var onToggleClickThrough: (() -> Void)?
     var onCycleSpeed: (() -> Void)?
@@ -44,6 +48,8 @@ final class Hotkeys {
         add(id: 4, keyCode: UInt32(kVK_ANSI_L), mods: UInt32(optionKey)) { [weak self] in self?.onListen?() }
         add(id: 5, keyCode: UInt32(kVK_ANSI_V), mods: UInt32(optionKey)) { [weak self] in self?.onReadScreen?() }
         add(id: 6, keyCode: UInt32(kVK_ANSI_S), mods: UInt32(optionKey | shiftKey)) { [weak self] in self?.onCycleSpeed?() }
+        add(id: 7, keyCode: UInt32(kVK_ANSI_A), mods: UInt32(optionKey)) { [weak self] in self?.onAutoRead?() }
+        add(id: 8, keyCode: UInt32(kVK_ANSI_V), mods: UInt32(optionKey | shiftKey)) { [weak self] in self?.onSeeScreen?() }
     }
 
     private func add(id: UInt32, keyCode: UInt32, mods: UInt32, action: @escaping () -> Void) {

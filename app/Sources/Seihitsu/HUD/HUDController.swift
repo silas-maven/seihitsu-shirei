@@ -44,6 +44,7 @@ final class HUDController {
         // self is fully initialized here, so it is safe to capture.
         vm.onCaptureRequested = { [weak self] in self?.captureAndRoute() }
         vm.onReadScreenRequested = { [weak self] in self?.readScreenAndRoute() }
+        vm.onSeeScreenRequested = { [weak self] in self?.seeScreenAndRoute() }
     }
 
     // MARK: HUD visibility
@@ -96,6 +97,16 @@ final class HUDController {
         vm.statusLine = "Speed: \(m.label)"
     }
 
+    /// Current code-handling mode (raw value), for the menu-bar Code submenu.
+    var currentCodeActionRaw: String { vm.codeAction.rawValue }
+
+    /// Set how captured code is handled (Explain vs Fix) from the menu.
+    func setCodeAction(_ raw: String) {
+        guard let a = CodeAction(rawValue: raw) else { return }
+        vm.codeAction = a
+        vm.statusLine = "Code: \(a.label)"
+    }
+
     /// Debug: flip the HUD out of `.none` so it appears in screenshots/screen shares, for
     /// troubleshooting. Toggling back restores capture exclusion.
     private var revealed = false
@@ -136,7 +147,7 @@ final class HUDController {
         if captured.looksLikeQuestion {
             vm.answerCapturedQuestion(captured.text, source: captured.source)
         } else if captured.looksLikeCode {
-            vm.fixCapturedCode(captured.text, source: captured.source)
+            vm.reviewCode(captured.text, source: captured.source)
         } else {
             vm.loadContext(captured.text, kind: .selection, source: captured.source)
         }
@@ -160,13 +171,104 @@ final class HUDController {
         Task { @MainActor in
             let text = await ScreenReader.read(region: region)
             if let text {
-                Log.log("screen-read: OCR \(text.count) chars")
-                vm.answerScreenText(text, source: nil)
+                if SelectionCapture.looksLikeCode(text) {
+                    Log.log("screen-read: OCR \(text.count) chars (code -> review)")
+                    vm.reviewCode(text, source: nil)
+                } else {
+                    Log.log("screen-read: OCR \(text.count) chars")
+                    vm.answerScreenText(text, source: nil)
+                }
             } else {
                 Log.log("screen-read: no readable text")
                 vm.screenReadEmpty()
             }
         }
+    }
+
+    /// Send the region screenshot to a vision model (⌥⇧V), instead of OCR. For diagrams/images.
+    func seeScreenAndRoute() {
+        show()
+        guard ScreenReader.ensurePermission() else {
+            vm.answer = "Grant Screen Recording to Seihitsu:\nSystem Settings > Privacy & Security > Screen Recording.\nThen relaunch and press ⌥⇧V."
+            vm.statusLine = "Needs Screen Recording permission"
+            return
+        }
+        let region = ScreenRegionStore.region
+        vm.beginScreenRead(region: ScreenRegionStore.describe + " (image)")
+        Log.log("screen-see: triggered; region=\(ScreenRegionStore.describe)")
+        Task { @MainActor in
+            if let img = await ScreenReader.readImage(region: region) {
+                Log.log("screen-see: image \(img.count) bytes")
+                vm.answerScreenImage(img, source: nil)
+            } else {
+                Log.log("screen-see: capture failed")
+                vm.screenReadEmpty()
+            }
+        }
+    }
+
+    // MARK: Auto-read (watch the region, answer new questions)
+
+    private var autoTask: Task<Void, Never>?
+    private var lastAutoText = ""       // last OCR reading seen (for stability)
+    private var lastAnsweredText = ""   // last text actually answered (avoid repeats)
+    private var autoStable = 0
+
+    var autoReadOn: Bool { vm.autoReading }
+
+    /// Toggle auto-read. When on, the saved region is polled locally and a new, settled question
+    /// is answered automatically. OCR is on-device, so polling is free; only a genuine change
+    /// spends a model call.
+    func toggleAutoRead() {
+        if vm.autoReading { stopAutoRead() } else { startAutoRead() }
+    }
+
+    private func startAutoRead() {
+        guard ScreenReader.ensurePermission() else {
+            show()
+            vm.answer = "Grant Screen Recording to Seihitsu, then relaunch and turn Auto-read on again."
+            vm.statusLine = "Needs Screen Recording permission"
+            return
+        }
+        show()
+        vm.autoReading = true
+        lastAutoText = ""; lastAnsweredText = ""; autoStable = 0
+        vm.statusLine = "Auto-read ON (\(ScreenRegionStore.describe))"
+        Log.log("auto-read: ON region=\(ScreenRegionStore.describe)")
+        autoTask = Task { @MainActor in
+            while self.vm.autoReading && !Task.isCancelled {
+                await self.autoTick()
+                try? await Task.sleep(nanoseconds: 1_000_000_000)   // ~1s poll
+            }
+        }
+    }
+
+    private func stopAutoRead() {
+        vm.autoReading = false
+        autoTask?.cancel(); autoTask = nil
+        vm.statusLine = "Auto-read off"
+        Log.log("auto-read: OFF")
+    }
+
+    private func autoTick() async {
+        guard vm.state != .thinking else { return }         // don't overlap a request
+        guard let text = await ScreenReader.read(region: ScreenRegionStore.region) else { return }
+        let norm = Self.normalise(text)
+        guard norm.count >= 6 else { return }               // ignore stray fragments
+        // Require the reading to be the same twice running, so we don't answer a mid-render frame.
+        if norm == lastAutoText { autoStable += 1 } else { autoStable = 0; lastAutoText = norm }
+        guard autoStable >= 1 else { return }
+        guard norm != lastAnsweredText else { return }      // same question already answered
+        lastAnsweredText = norm
+        Log.log("auto-read: new question \(norm.count) chars -> answering")
+        vm.answerScreenText(text, source: nil)
+    }
+
+    private static func normalise(_ s: String) -> String {
+        s.lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     /// Let the user drag out the area Seihitsu reads. Saved and reused by ⌥V. Cancelling (Esc)

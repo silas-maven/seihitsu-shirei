@@ -5,12 +5,16 @@ enum HUDPrompts {
     static let system = """
     You are a concise heads-up assistant shown in a small always-on-top overlay. Answer in \
     the fewest words that are fully correct. No preamble, no restating the question, no \
-    sign-off. For code, output the corrected code first (in a fenced block), then at most one \
-    short line explaining the fix. Prefer short answers; expand only when essential.
+    sign-off. For code, be specific: point to the exact problem and the precise fix. Prefer \
+    short answers; expand only when essential.
     """
 
-    /// Default instruction when the user highlights code and wants it fixed.
+    /// Highlighted code, "Fix" mode: return the corrected version.
     static let fixCode = "Find the problem in this code and output a corrected version. Be concise: show the fixed code, then one short line on what was wrong."
+
+    /// Highlighted code, "Explain" mode (the default): explain the fault and the fix, without
+    /// pasting a full rewrite. For reviewing a snippet you have to talk about.
+    static let explainCode = "This is a code snippet. Explain specifically what is wrong with it and how to fix it: name the exact line or token at fault and state the change needed, in a few short lines. Do NOT paste a full corrected version of the code; describe the fix precisely. If nothing is wrong, say in one or two lines what the code does."
 
     /// Instruction paired with text read off the screen via OCR (⌥V). The captured text is
     /// attached above this line, so the model answers the question it finds without the user
@@ -60,6 +64,26 @@ enum AnswerMode: String, CaseIterable {
         case .full:  return nil    // backend default (~1500)
         case .brief: return 220
         case .blitz: return 40
+        }
+    }
+}
+
+/// What to do when captured content is code. Explain (the default) reviews it, naming the fault
+/// and the fix without a full rewrite; Fix returns the corrected code. Persisted; set in the menu.
+enum CodeAction: String, CaseIterable {
+    case explain, fix
+
+    var label: String {
+        switch self {
+        case .explain: return "Explain"
+        case .fix:     return "Fix (rewrite)"
+        }
+    }
+
+    var instruction: String {
+        switch self {
+        case .explain: return HUDPrompts.explainCode
+        case .fix:     return HUDPrompts.fixCode
         }
     }
 }

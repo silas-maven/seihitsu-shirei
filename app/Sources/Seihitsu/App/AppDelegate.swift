@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onToggleHUD = { [weak hud] in hud?.toggle() }
         menuBar.onCaptureSelection = { [weak hud] in hud?.captureAndRoute() }
         menuBar.onReadScreen = { [weak hud] in hud?.readScreenAndRoute() }
+        menuBar.onSeeScreen = { [weak hud] in hud?.seeScreenAndRoute() }
+        menuBar.onAutoRead = { [weak hud] in hud?.toggleAutoRead() }
+        menuBar.isAutoReadOn = { [weak hud] in hud?.autoReadOn ?? false }
         menuBar.onSetRegion = { [weak hud] in hud?.pickRegion() }
         menuBar.onClearRegion = { [weak hud] in hud?.clearRegion() }
         menuBar.onListen = { [weak hud] in hud?.toggleListen() }
@@ -50,6 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return AnswerMode.allCases.map { (id: $0.rawValue, name: $0.label, active: $0.rawValue == hud.currentModeRaw) }
         }
         menuBar.onSelectMode = { [weak hud] raw in hud?.setMode(raw) }
+        menuBar.codeList = { [weak hud] in
+            guard let hud else { return [] }
+            return CodeAction.allCases.map { (id: $0.rawValue, name: $0.label, active: $0.rawValue == hud.currentCodeActionRaw) }
+        }
+        menuBar.onSelectCode = { [weak hud] raw in hud?.setCodeAction(raw) }
         menuBar.onOpenSettings = { [weak self] in self?.hud?.hide(); self?.settings.show() }
         menuBar.install()
         self.menuBar = menuBar
@@ -70,6 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.onSummon = { [weak hud] in hud?.toggle() }
         hotkeys.onCapture = { [weak hud] in hud?.captureAndRoute() }
         hotkeys.onReadScreen = { [weak hud] in hud?.readScreenAndRoute() }
+        hotkeys.onSeeScreen = { [weak hud] in hud?.seeScreenAndRoute() }
+        hotkeys.onAutoRead = { [weak hud] in hud?.toggleAutoRead() }
         hotkeys.onListen = { [weak hud] in hud?.toggleListen() }
         hotkeys.onToggleClickThrough = { [weak hud] in hud?.toggleClickThrough() }
         hotkeys.onCycleSpeed = { [weak hud] in hud?.cycleSpeed() }

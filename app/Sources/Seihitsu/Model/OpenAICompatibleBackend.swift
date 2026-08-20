@@ -11,11 +11,13 @@ final class OpenAICompatibleBackend: ModelBackend {
     private let baseURL: String
     private let apiKeyAccount: String?
 
-    init(id: String, model: String, baseURL: String, apiKeyAccount: String?, vision: Bool = false) {
+    init(id: String, model: String, baseURL: String, apiKeyAccount: String?, vision: Bool = true) {
         self.id = id
         self.model = model
         self.baseURL = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
         self.apiKeyAccount = apiKeyAccount
+        // The OpenAI chat wire format carries images (data URLs); whether the chosen model can
+        // actually see them is the model's business. We advertise vision so the ⌥⇧V path is allowed.
         self.capabilities = Capabilities(streaming: true, agentic: false, sessions: false, vision: vision, tools: false)
     }
 
@@ -34,9 +36,20 @@ final class OpenAICompatibleBackend: ModelBackend {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let key, !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
 
-        let messages: [[String: String]] = [
+        // User content is a bare string, unless there is an image, in which case it becomes the
+        // OpenAI multimodal array [text, image_url(data URL)].
+        let userContent: Any
+        if let img = req.imageData {
+            userContent = [
+                ["type": "text", "text": req.wireText()],
+                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(img.base64EncodedString())"]],
+            ]
+        } else {
+            userContent = req.wireText()
+        }
+        let messages: [[String: Any]] = [
             ["role": "system", "content": req.system ?? HUDPrompts.system],
-            ["role": "user", "content": req.wireText()],
+            ["role": "user", "content": userContent],
         ]
         let body: [String: Any] = [
             "model": req.model ?? model,

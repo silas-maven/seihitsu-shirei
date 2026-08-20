@@ -29,6 +29,31 @@ Build plan: `docs/ARCHITECTURE.md`. Decisions: `docs/collab/DECISIONS.md`.
 
 ## Session Log
 
+### 2026-08-20 (claude-2 / Vladimir) - code review: Explain vs Fix
+- Captured code no longer defaults to dumping a corrected version. New **CodeAction** toggle
+  (`HUDPrompts.swift`): **Explain** (default) says specifically what is wrong and how to fix it,
+  naming the line/token, WITHOUT a full rewrite; **Fix** returns the corrected code (old behaviour).
+- Applies wherever code is detected: ⌥C selection (`route`) and ⌥V screen-read (`readScreenAndRoute`,
+  via the now-exposed `SelectionCapture.looksLikeCode`). `HUDViewModel.fixCapturedCode` renamed to
+  `reviewCode`, uses `codeAction.instruction`. Persisted (UserDefaults).
+- Softened `HUDPrompts.system` code clause (was "output the corrected code first", which fought
+  Explain). Surfaced as a menu-bar **Code** submenu (Explain / Fix, checkmarks rebuilt on open).
+  Built clean, stable-signed, relaunched. NOT committed.
+
+### 2026-08-19i (claude-2 / Vladimir) - auto-read region + vision path
+- **Auto-read (⌥A, menu toggle, "AUTO" HUD indicator)**: polls the saved region ~1s,
+  OCRs locally (free), and auto-answers a new question once its text settles (same reading
+  twice) and differs from the last answered. Guards against overlapping model calls
+  (skips while thinking). Loop in `HUDController` (`autoTick`/`normalise`).
+- **Vision path (⌥⇧V, "See" button, menu "See screen as image")**: captures the region as a
+  downscaled JPEG (`ScreenReader.readImage`/`jpegData`) and sends it to a vision model instead
+  of OCR. `Prompt.imageData` added; `OpenAICompatibleBackend` now builds the OpenAI multimodal
+  content array (data URL) and advertises `vision`. Gated in `HUDViewModel.answerScreenImage`:
+  non-vision backends show "switch to OpenRouter/OpenAI". Works with the default OpenRouter
+  llama-4-scout (multimodal). Anthropic/Gemini image wire formats NOT yet added (text-only).
+- Hotkeys now id 1-8 (added ⌥A=7, ⌥⇧V=8). Built clean, stable-signed, relaunched; all 8
+  register. NOT committed.
+
 ### 2026-08-19h (claude-2 / Vladimir) - answer speed control (Full/Brief/Blitz)
 - Added a 3-level speed control for timed questions: **Full** (default, ~1500 tok),
   **Brief** (one to two lines, 220 tok), **Blitz** (answer only, 40 tok; for MCQ just the

@@ -31,6 +31,13 @@ enum ScreenReader {
         return trimmed.isEmpty ? nil : text
     }
 
+    /// Capture the given region as a JPEG, for sending to a vision model (⌥⇧V). Downscaled so the
+    /// payload stays small. Returns `nil` if capture failed.
+    static func readImage(region: CGRect?) async -> Data? {
+        guard let image = await capture(region: region) else { return nil }
+        return jpegData(image, maxDim: 1400, quality: 0.85)
+    }
+
     // MARK: Capture
 
     private static func capture(region: CGRect?) async -> CGImage? {
@@ -64,6 +71,26 @@ enum ScreenReader {
             Log.log("screen-read: capture failed: \(error.localizedDescription)")
             return nil
         }
+    }
+
+    /// CGImage -> JPEG Data, downscaling so the longest side is at most `maxDim`.
+    private static func jpegData(_ cg: CGImage, maxDim: CGFloat, quality: CGFloat) -> Data? {
+        let w = CGFloat(cg.width), h = CGFloat(cg.height)
+        let scale = min(1, maxDim / max(w, h))
+        let rep: NSBitmapImageRep
+        if scale < 1 {
+            let nw = max(1, Int(w * scale)), nh = max(1, Int(h * scale))
+            guard let ctx = CGContext(data: nil, width: nw, height: nh, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            ctx.interpolationQuality = .high
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: nw, height: nh))
+            guard let scaled = ctx.makeImage() else { return nil }
+            rep = NSBitmapImageRep(cgImage: scaled)
+        } else {
+            rep = NSBitmapImageRep(cgImage: cg)
+        }
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])
     }
 
     // MARK: OCR (on-device Vision, off the main thread)

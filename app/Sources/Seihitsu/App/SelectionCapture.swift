@@ -118,7 +118,7 @@ enum SelectionCapture {
         return starts.contains { lower.hasPrefix($0) }
     }
 
-    private static func looksLikeCode(_ s: String) -> Bool {
+    static func looksLikeCode(_ s: String) -> Bool {
         let tokens = ["{", "}", ";", "=>", "()", "def ", "func ", "class ", "import ",
                       "const ", "let ", "var ", "return ", "public ", "private ", "#include",
                       "</", "/>", "==", "!=", "->"]

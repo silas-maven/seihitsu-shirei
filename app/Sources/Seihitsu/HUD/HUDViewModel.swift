@@ -19,13 +19,23 @@ final class HUDViewModel: ObservableObject {
     @Published var modelName = ""
     /// True while the microphone is capturing for speech-to-text.
     @Published var isListening = false
+    /// True while auto-read is watching the screen region and answering new questions.
+    @Published var autoReading = false
     /// Answer length/speed. Blitz caps output hard for timed questions. Persisted.
     @Published var mode: AnswerMode = .full { didSet { Self.saveMode(mode) } }
+    /// How captured code is handled: Explain (review) or Fix (rewrite). Persisted.
+    @Published var codeAction: CodeAction = .explain { didSet { Self.saveCodeAction(codeAction) } }
 
     private static let modeKey = "Seihitsu.answerMode"
     private static func saveMode(_ m: AnswerMode) { UserDefaults.standard.set(m.rawValue, forKey: modeKey) }
     private static func loadMode() -> AnswerMode {
         AnswerMode(rawValue: UserDefaults.standard.string(forKey: modeKey) ?? "") ?? .full
+    }
+
+    private static let codeActionKey = "Seihitsu.codeAction"
+    private static func saveCodeAction(_ a: CodeAction) { UserDefaults.standard.set(a.rawValue, forKey: codeActionKey) }
+    private static func loadCodeAction() -> CodeAction {
+        CodeAction(rawValue: UserDefaults.standard.string(forKey: codeActionKey) ?? "") ?? .explain
     }
 
     /// Step Full -> Brief -> Blitz -> Full. Bound to ⌥⇧S.
@@ -43,6 +53,9 @@ final class HUDViewModel: ObservableObject {
     /// Set by the controller; the Read button forwards to it (OCR the saved screen region).
     var onReadScreenRequested: (() -> Void)?
     func requestReadScreen() { onReadScreenRequested?() }
+    /// Set by the controller; the See button forwards to it (send the region image to a vision model).
+    var onSeeScreenRequested: (() -> Void)?
+    func requestSeeScreen() { onSeeScreenRequested?() }
 
     private let resolveBackend: () -> ModelBackend
     private let listener = SpeechListener()
@@ -51,6 +64,7 @@ final class HUDViewModel: ObservableObject {
     init(resolveBackend: @escaping () -> ModelBackend) {
         self.resolveBackend = resolveBackend
         self.mode = Self.loadMode()
+        self.codeAction = Self.loadCodeAction()
     }
 
     // MARK: Listen (voice)
@@ -135,6 +149,24 @@ final class HUDViewModel: ObservableObject {
         statusLine = "Answering from screen…"
     }
 
+    /// Send the region screenshot to a vision-capable model (⌥⇧V). For diagrams/images, or text
+    /// the OCR path struggles with. Gated: only backends that advertise vision accept an image.
+    func answerScreenImage(_ image: Data, source: String?) {
+        context = nil
+        prompt = ""
+        guard resolveBackend().capabilities.vision else {
+            state = .error
+            answer = "The current model can't see images.\nSwitch to OpenRouter or OpenAI in the Model menu, then press ⌥⇧V again."
+            statusLine = "Vision needs an image-capable model"
+            onGlyph?(.idle)
+            return
+        }
+        var req = Prompt(text: HUDPrompts.answerScreen)
+        req.imageData = image
+        run(req)
+        statusLine = "Answering from screen image…"
+    }
+
     /// Nothing readable was found in the capture region.
     func screenReadEmpty() {
         state = .idle
@@ -143,13 +175,15 @@ final class HUDViewModel: ObservableObject {
         onGlyph?(.idle)
     }
 
-    /// Highlighted code is fixed immediately with a concise default instruction.
-    func fixCapturedCode(_ code: String, source: String?) {
+    /// Captured code is reviewed immediately. Per `codeAction`: Explain (what's wrong + the fix,
+    /// no rewrite) by default, or Fix (return the corrected code).
+    func reviewCode(_ code: String, source: String?) {
         let att = Attachment(kind: .code, content: code, source: source)
         context = att
         prompt = ""
-        run(Prompt(text: HUDPrompts.fixCode, attachments: [att]))
-        statusLine = "Fixing highlighted code from \(source ?? "screen")…"
+        run(Prompt(text: codeAction.instruction, attachments: [att]))
+        let verb = (codeAction == .explain) ? "Explaining" : "Fixing"
+        statusLine = "\(verb) code from \(source ?? "screen")…"
     }
 
     /// Copy the current answer to the pasteboard.

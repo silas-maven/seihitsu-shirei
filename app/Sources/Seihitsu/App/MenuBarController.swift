@@ -6,6 +6,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onToggleHUD: (() -> Void)?
     var onCaptureSelection: (() -> Void)?
     var onReadScreen: (() -> Void)?
+    var onSeeScreen: (() -> Void)?
+    var onAutoRead: (() -> Void)?
+    var isAutoReadOn: () -> Bool = { false }
     var onSetRegion: (() -> Void)?
     var onClearRegion: (() -> Void)?
     var onListen: (() -> Void)?
@@ -24,9 +27,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var modeList: () -> [(id: String, name: String, active: Bool)] = { [] }
     var onSelectMode: ((String) -> Void)?
 
+    /// Code-handling list + selection, supplied by the HUD (Explain / Fix).
+    var codeList: () -> [(id: String, name: String, active: Bool)] = { [] }
+    var onSelectCode: ((String) -> Void)?
+
     private var statusItem: NSStatusItem?
     private let modelMenu = NSMenu()
     private let speedMenu = NSMenu()
+    private let codeMenu = NSMenu()
+    private weak var autoItem: NSMenuItem?
 
     func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -34,9 +43,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         applyGlyph(.idle)
 
         let menu = NSMenu()
+        menu.delegate = self   // keep the Auto-read checkmark current when the menu opens
         menu.addItem(withTitle: "Show / Hide HUD  (⌥Space)", action: #selector(toggleHUD), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Capture selection  (⌥C)", action: #selector(captureSelection), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Read screen  (⌥V)", action: #selector(readScreen), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "See screen as image  (⌥⇧V)", action: #selector(seeScreen), keyEquivalent: "").target = self
+        let auto = NSMenuItem(title: "Auto-read region  (⌥A)", action: #selector(autoRead), keyEquivalent: "")
+        auto.target = self
+        auto.state = isAutoReadOn() ? .on : .off
+        menu.addItem(auto)
+        autoItem = auto
         menu.addItem(withTitle: "Listen  (⌥L)", action: #selector(listen), keyEquivalent: "").target = self
 
         let modelItem = NSMenuItem(title: "Model", action: nil, keyEquivalent: "")
@@ -47,6 +63,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         speedItem.submenu = speedMenu
         speedMenu.delegate = self     // rebuild on open so the checkmark reflects HUD/hotkey changes
         menu.addItem(speedItem)
+
+        let codeItem = NSMenuItem(title: "Code", action: nil, keyEquivalent: "")
+        codeItem.submenu = codeMenu
+        codeMenu.delegate = self
+        menu.addItem(codeItem)
 
         menu.addItem(.separator())
         menu.addItem(withTitle: "Set screen region…", action: #selector(setRegion), keyEquivalent: "").target = self
@@ -63,27 +84,34 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         rebuildProviderMenu()
         rebuildSpeedMenu()
+        rebuildCodeMenu()
     }
 
-    func rebuildSpeedMenu() {
-        speedMenu.removeAllItems()
-        for m in modeList() {
-            let it = NSMenuItem(title: m.name, action: #selector(selectMode(_:)), keyEquivalent: "")
+    func rebuildSpeedMenu() { fill(speedMenu, from: modeList(), action: #selector(selectMode(_:))) }
+    func rebuildCodeMenu()  { fill(codeMenu, from: codeList(), action: #selector(selectCode(_:))) }
+
+    private func fill(_ menu: NSMenu, from rows: [(id: String, name: String, active: Bool)], action: Selector) {
+        menu.removeAllItems()
+        for r in rows {
+            let it = NSMenuItem(title: r.name, action: action, keyEquivalent: "")
             it.target = self
-            it.representedObject = m.id
-            it.state = m.active ? .on : .off
-            speedMenu.addItem(it)
+            it.representedObject = r.id
+            it.state = r.active ? .on : .off
+            menu.addItem(it)
         }
-        if speedMenu.items.isEmpty {
+        if menu.items.isEmpty {
             let empty = NSMenuItem(title: "—", action: nil, keyEquivalent: "")
             empty.isEnabled = false
-            speedMenu.addItem(empty)
+            menu.addItem(empty)
         }
     }
 
-    /// Keep the Speed checkmark current whether the mode was changed here, in the HUD, or via ⌥⇧S.
+    /// Keep the Speed, Code, and Auto-read state current whether it was changed here, in the HUD,
+    /// or via a hotkey.
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === speedMenu { rebuildSpeedMenu() }
+        else if menu === codeMenu { rebuildCodeMenu() }
+        else { autoItem?.state = isAutoReadOn() ? .on : .off }
     }
 
     func rebuildProviderMenu() {
@@ -120,6 +148,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleHUD() { onToggleHUD?() }
     @objc private func captureSelection() { onCaptureSelection?() }
     @objc private func readScreen() { onReadScreen?() }
+    @objc private func seeScreen() { onSeeScreen?() }
+    @objc private func autoRead() { onAutoRead?() }
     @objc private func setRegion() { onSetRegion?() }
     @objc private func clearRegion() { onClearRegion?() }
     @objc private func listen() { onListen?() }
@@ -138,5 +168,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let id = sender.representedObject as? String else { return }
         onSelectMode?(id)
         rebuildSpeedMenu()
+    }
+    @objc private func selectCode(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onSelectCode?(id)
+        rebuildCodeMenu()
     }
 }
