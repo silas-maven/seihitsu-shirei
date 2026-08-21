@@ -45,6 +45,14 @@ final class HUDController {
         vm.onCaptureRequested = { [weak self] in self?.captureAndRoute() }
         vm.onReadScreenRequested = { [weak self] in self?.readScreenAndRoute() }
         vm.onSeeScreenRequested = { [weak self] in self?.seeScreenAndRoute() }
+        vm.onOpacityChanged = { [weak self] o in self?.panel.alphaValue = o }
+        panel.alphaValue = vm.opacity   // apply the persisted opacity at launch
+
+        // A reliable corner resize handle, stuck to the bottom-right and above the SwiftUI content.
+        // Inset 10 so the glyph clears the 20pt rounded corner (which is clipped by the glass).
+        let grip = ResizeGripView(frame: NSRect(x: bounds.width - 32, y: 10, width: 22, height: 22))
+        grip.autoresizingMask = [.minXMargin, .maxYMargin]
+        glass.addSubview(grip)
     }
 
     // MARK: HUD visibility
@@ -107,6 +115,23 @@ final class HUDController {
         vm.statusLine = "Code: \(a.label)"
     }
 
+    /// Active use-case profile (raw value), for the menu-bar Profile submenu.
+    var currentProfileRaw: String { vm.profile.rawValue }
+
+    /// Select a profile from the menu; snaps speed + code mode and shows the HUD.
+    func setProfile(_ raw: String) {
+        guard let p = Profile(rawValue: raw) else { return }
+        if !panel.isVisible { show() }
+        vm.profile = p
+    }
+
+    /// Collect-mode state + toggle, for the menu and multi-file review.
+    var collectingOn: Bool { vm.collecting }
+    func toggleCollect() {
+        if !panel.isVisible { show() }
+        vm.toggleCollect()
+    }
+
     /// Debug: flip the HUD out of `.none` so it appears in screenshots/screen shares, for
     /// troubleshooting. Toggling back restores capture exclusion.
     private var revealed = false
@@ -144,7 +169,9 @@ final class HUDController {
             }
             return
         }
-        if captured.looksLikeQuestion {
+        if vm.collecting {
+            vm.addToCollection(captured.text, kind: captured.looksLikeCode ? .code : .selection, source: captured.source)
+        } else if captured.looksLikeQuestion {
             vm.answerCapturedQuestion(captured.text, source: captured.source)
         } else if captured.looksLikeCode {
             vm.reviewCode(captured.text, source: captured.source)
@@ -171,7 +198,10 @@ final class HUDController {
         Task { @MainActor in
             let text = await ScreenReader.read(region: region)
             if let text {
-                if SelectionCapture.looksLikeCode(text) {
+                if vm.collecting {
+                    Log.log("screen-read: OCR \(text.count) chars (collected)")
+                    vm.addToCollection(text, kind: SelectionCapture.looksLikeCode(text) ? .code : .screenText, source: nil)
+                } else if SelectionCapture.looksLikeCode(text) {
                     Log.log("screen-read: OCR \(text.count) chars (code -> review)")
                     vm.reviewCode(text, source: nil)
                 } else {

@@ -58,6 +58,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return CodeAction.allCases.map { (id: $0.rawValue, name: $0.label, active: $0.rawValue == hud.currentCodeActionRaw) }
         }
         menuBar.onSelectCode = { [weak hud] raw in hud?.setCodeAction(raw) }
+        menuBar.profileList = { [weak hud] in
+            guard let hud else { return [] }
+            return Profile.allCases.map { (id: $0.rawValue, name: $0.label, active: $0.rawValue == hud.currentProfileRaw) }
+        }
+        menuBar.onSelectProfile = { [weak hud] raw in hud?.setProfile(raw) }
+        menuBar.onToggleCollect = { [weak hud] in hud?.toggleCollect() }
+        menuBar.isCollectingOn = { [weak hud] in hud?.collectingOn ?? false }
         menuBar.onOpenSettings = { [weak self] in self?.hud?.hide(); self?.settings.show() }
         menuBar.install()
         self.menuBar = menuBar
@@ -86,11 +93,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.register()
 
         installMainMenu()
+        repairKeychainAccessOnce()
 
         // Debug aid: SEIHITSU_AUTOSHOW=1 opens the HUD on launch (used to exercise the
         // render path headlessly; the HUD itself is excluded from screen capture).
         if ProcessInfo.processInfo.environment["SEIHITSU_AUTOSHOW"] == "1" {
             hud.show()
+        }
+    }
+
+    /// One-time migration: rewrite existing API keys so they carry the non-interactive ACL, ending
+    /// the "enter your login keychain password" prompt on every launch. Prompts at most once (to
+    /// read the existing key); after that the rewritten item never challenges again. The flag is
+    /// only set on a clean pass, so a cancelled prompt just retries next launch.
+    private func repairKeychainAccessOnce() {
+        let flag = "Seihitsu.keychainRepaired.v1"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        // Off the main thread: reading an item with a stale ACL shows a modal keychain prompt, and
+        // the SecItem call blocks until it is answered. We must not freeze the UI while it is up.
+        DispatchQueue.global(qos: .utility).async {
+            let ok = Keychain.repairAccess(service: "Seihitsu.apikeys",
+                                           accounts: ["openrouter", "openai", "anthropic", "gemini"])
+            if ok { UserDefaults.standard.set(true, forKey: flag) }
+            Log.log("keychain: repair pass completed=\(ok)")
         }
     }
 

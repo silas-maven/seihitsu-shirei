@@ -87,3 +87,62 @@ enum CodeAction: String, CaseIterable {
         }
     }
 }
+
+/// A use-case preset. Selecting one snaps the speed and code mode and adds a short persona line to
+/// the system prompt. `standard` is exactly how the app behaves with no profile chosen. Persisted.
+enum Profile: String, CaseIterable {
+    case standard, mcq, solve, review, coding, systemDesign, fde, behavioural, meeting
+
+    var label: String {
+        switch self {
+        case .standard:     return "Standard"
+        case .mcq:          return "Exam / MCQ"
+        case .solve:        return "Coding assessment"
+        case .review:       return "Code review"
+        case .coding:       return "Coding interview"
+        case .systemDesign: return "System design"
+        case .fde:          return "FDE interview"
+        case .behavioural:  return "Behavioural"
+        case .meeting:      return "Meeting / call"
+        }
+    }
+
+    var answerMode: AnswerMode {
+        switch self {
+        case .mcq:                             return .blitz
+        case .coding, .fde, .behavioural, .meeting: return .brief
+        case .standard, .solve, .review, .systemDesign: return .full
+        }
+    }
+
+    var codeAction: CodeAction {
+        switch self {
+        case .solve: return .fix          // an assessment wants the full working solution
+        default:     return .explain
+        }
+    }
+
+    /// Persona/context appended to the system prompt. nil for `standard` (unchanged behaviour).
+    var systemAddendum: String? {
+        switch self {
+        case .standard:
+            return nil
+        case .mcq:
+            return "You are answering timed multiple-choice or exam questions. Give only the correct option or answer."
+        case .solve:
+            return "You are in a coding assessment. Produce a complete, correct, runnable solution including the code."
+        case .review:
+            return "You are reviewing code in a live technical assessment. Identify the bug or issue and how to fix it specifically. If several files or snippets are attached, reason about them together."
+        case .coding:
+            return "You are assisting in a live coding interview. Give concise talking points: the approach and the reasoning to say out loud."
+        case .systemDesign:
+            return "You are assisting in a system design interview. Answer in structured, concise points: requirements, high-level design, key components, data model, trade-offs, and how it scales."
+        case .fde:
+            return "You are assisting in a Forward Deployed Engineer interview, a mix of live coding, debugging, and customer-facing system design. Be concise, practical, and specific."
+        case .behavioural:
+            return "You are assisting in a behavioural interview. Suggest a concise, confident answer using the STAR structure (Situation, Task, Action, Result)."
+        case .meeting:
+            return "You are assisting in a live meeting or sales call. Offer concise, useful talking points and answers as the conversation moves."
+        }
+    }
+}

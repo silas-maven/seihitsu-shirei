@@ -21,10 +21,27 @@ final class HUDViewModel: ObservableObject {
     @Published var isListening = false
     /// True while auto-read is watching the screen region and answering new questions.
     @Published var autoReading = false
+    /// HUD opacity (window alpha), 0.25...1.0. Persisted. Lower = more see-through.
+    @Published var opacity: Double = 1.0 { didSet { Self.saveOpacity(opacity); onOpacityChanged?(opacity) } }
+    /// Set by the controller: apply the opacity to the panel's alphaValue.
+    var onOpacityChanged: ((Double) -> Void)?
+
+    private static let opacityKey = "Seihitsu.opacity"
+    private static func saveOpacity(_ o: Double) { UserDefaults.standard.set(o, forKey: opacityKey) }
+    static func loadOpacity() -> Double {
+        guard let v = UserDefaults.standard.object(forKey: opacityKey) as? Double else { return 1.0 }
+        return min(1.0, max(0.25, v))
+    }
     /// Answer length/speed. Blitz caps output hard for timed questions. Persisted.
     @Published var mode: AnswerMode = .full { didSet { Self.saveMode(mode) } }
     /// How captured code is handled: Explain (review) or Fix (rewrite). Persisted.
     @Published var codeAction: CodeAction = .explain { didSet { Self.saveCodeAction(codeAction) } }
+    /// Use-case preset. Selecting one snaps speed + code mode and adds a persona line. Persisted.
+    @Published var profile: Profile = .standard { didSet { Self.saveProfile(profile); applyProfile() } }
+    /// Collect mode: captures accumulate into a buffer (for multi-file review) instead of being
+    /// answered one at a time. The whole buffer is sent with the next question.
+    @Published var collecting = false
+    @Published var collected: [Attachment] = []
 
     private static let modeKey = "Seihitsu.answerMode"
     private static func saveMode(_ m: AnswerMode) { UserDefaults.standard.set(m.rawValue, forKey: modeKey) }
@@ -38,11 +55,52 @@ final class HUDViewModel: ObservableObject {
         CodeAction(rawValue: UserDefaults.standard.string(forKey: codeActionKey) ?? "") ?? .explain
     }
 
+    private static let profileKey = "Seihitsu.profile"
+    private static func saveProfile(_ p: Profile) { UserDefaults.standard.set(p.rawValue, forKey: profileKey) }
+    private static func loadProfile() -> Profile {
+        Profile(rawValue: UserDefaults.standard.string(forKey: profileKey) ?? "") ?? .standard
+    }
+
+    /// Snap speed + code mode to the chosen profile (its persona line is applied in `run`).
+    private func applyProfile() {
+        mode = profile.answerMode
+        codeAction = profile.codeAction
+        statusLine = "Profile: \(profile.label)"
+    }
+
     /// Step Full -> Brief -> Blitz -> Full. Bound to ⌥⇧S.
     func cycleMode() {
         let all = AnswerMode.allCases
         if let i = all.firstIndex(of: mode) { mode = all[(i + 1) % all.count] }
         statusLine = "Speed: \(mode.label)"
+    }
+
+    // MARK: Collect buffer (multi-file review)
+
+    /// Toggle collect mode. On: fresh buffer; captures accumulate. Off: buffer stays usable for one
+    /// more question. Bound to a menu item.
+    func toggleCollect() {
+        collecting.toggle()
+        if collecting {
+            collected = []
+            statusLine = "Collect ON — capture snippets, then type a question"
+        } else {
+            statusLine = collected.isEmpty ? "Collect off" : "Collect off — \(collected.count) snippet(s) ready"
+        }
+    }
+
+    /// Append a captured snippet to the collection instead of answering it immediately.
+    func addToCollection(_ text: String, kind: Attachment.Kind, source: String?) {
+        collected.append(Attachment(kind: kind, content: text, source: source))
+        answer = ""
+        state = .idle
+        statusLine = "Collected \(collected.count) snippet(s). Add more, or type a question."
+        requestFocus()
+    }
+
+    func clearCollected() {
+        collected = []
+        statusLine = "Collection cleared"
     }
 
     var onGlyph: ((GlyphState) -> Void)?
@@ -65,6 +123,8 @@ final class HUDViewModel: ObservableObject {
         self.resolveBackend = resolveBackend
         self.mode = Self.loadMode()
         self.codeAction = Self.loadCodeAction()
+        self.opacity = Self.loadOpacity()
+        self.profile = Self.loadProfile()   // display + persona only; does not re-snap mode on launch
     }
 
     // MARK: Listen (voice)
@@ -204,13 +264,14 @@ final class HUDViewModel: ObservableObject {
         requestFocus()
     }
 
-    /// User pressed Enter in the prompt field.
+    /// User pressed Enter in the prompt field. Includes the collect buffer, then the single context.
     func submit() {
         let q = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard state != .thinking else { return }
-        guard !q.isEmpty || context != nil else { return }
-        let req = Prompt(text: q, attachments: context.map { [$0] } ?? [])
-        run(req)
+        var atts = collected
+        if let c = context { atts.append(c) }
+        guard !q.isEmpty || !atts.isEmpty else { return }
+        run(Prompt(text: q, attachments: atts))
     }
 
     private func run(_ reqIn: Prompt) {
@@ -218,6 +279,10 @@ final class HUDViewModel: ObservableObject {
         var req = reqIn
         if req.system == nil { req.system = mode.system }
         if req.maxTokens == nil { req.maxTokens = mode.maxTokens }
+        // Layer the active profile's persona on top of whatever system prompt we ended up with.
+        if let addendum = profile.systemAddendum {
+            req.system = (req.system ?? HUDPrompts.system) + "\n\n" + addendum
+        }
 
         answer = ""
         state = .thinking

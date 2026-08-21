@@ -29,6 +29,38 @@ Build plan: `docs/ARCHITECTURE.md`. Decisions: `docs/collab/DECISIONS.md`.
 
 ## Session Log
 
+### 2026-08-21 (claude-2 / Vladimir) - keychain prompt fix, profiles, collect buffer
+- **Keychain prompt every launch FIXED.** Root cause: `Keychain.write` used a bare `SecItemAdd`
+  with no ACL, so items (esp. any created via the `security` CLI) trusted nothing and macOS
+  challenged every read; "Always Allow" never stuck. Now writes attach a non-interactive ACL
+  (legacy `SecAccessCreate` + `SecACLSetContents(nil app list)` = allow-all, no prompt). Added
+  `Keychain.repairAccess` + a one-time launch migration (`repairKeychainAccessOnce`, on a bg
+  thread so the modal prompt can't freeze the UI, flag `Seihitsu.keychainRepaired.v1` set only on
+  a clean pass). Trade-off: any local app can read the key without a prompt - acceptable for a
+  personal tool. (Legacy SecKeychain APIs = deprecation warnings, still function.)
+- **Profiles** (`Profile` in HUDPrompts): Standard (=current behaviour, default), Exam/MCQ,
+  Coding assessment, Code review, Coding interview, System design, FDE, Behavioural, Meeting.
+  Selecting one snaps speed + code mode and layers a persona line into the system prompt (in
+  `run`). Persisted; menu-bar **Profile** submenu; shown in the footer when not Standard. Launch
+  does NOT re-snap mode (respects last manual state).
+- **Collect buffer** (multi-file review): menu toggle "Collect snippets". While on, ⌥C/⌥V append
+  to `collected: [Attachment]` instead of answering; the next question is sent against the whole
+  stack. `wireText` numbers snippets when >1. HUD shows a COLLECT N indicator + a clearable chip.
+- All builds clean, stable-signed, relaunched; 8 hotkeys register. NOT committed. Keychain fix +
+  HUD behaviour unverified visually (Hamza to confirm the prompt is gone after one more Allow).
+
+### 2026-08-20b (claude-2 / Vladimir) - reliable resize grip + opacity control
+- **Resize**: the borderless OS resize border was too thin to grab. Added `ResizeGripView`
+  (AppKit, `HUD/ResizeGripView.swift`), a 22pt bottom-right handle added over the SwiftUI
+  content by HUDController. Overrides `mouseDownCanMoveWindow=false` (the panel has
+  `isMovableByWindowBackground`, which otherwise hijacks the drag); resizes from bottom-right
+  keeping the top-left pinned, clamped to minSize. Hover brightens the glyph.
+- **Opacity**: `HUDViewModel.opacity` (0.25...1.0, persisted) drives `panel.alphaValue` via a
+  small Slider in the answer header (`opacityControl`). Applied at launch. Removed the footer
+  shortcut hint and added trailing padding so the grip corner is clear.
+- Built clean, stable-signed, relaunched. NOT committed. Behaviour unverified visually (HUD is
+  .none, I can't see it) - Hamza to confirm the grip is grabbable and opacity feels right.
+
 ### 2026-08-20 (claude-2 / Vladimir) - code review: Explain vs Fix
 - Captured code no longer defaults to dumping a corrected version. New **CodeAction** toggle
   (`HUDPrompts.swift`): **Explain** (default) says specifically what is wrong and how to fix it,

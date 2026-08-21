@@ -31,11 +31,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var codeList: () -> [(id: String, name: String, active: Bool)] = { [] }
     var onSelectCode: ((String) -> Void)?
 
+    /// Use-case profile list + selection, supplied by the HUD.
+    var profileList: () -> [(id: String, name: String, active: Bool)] = { [] }
+    var onSelectProfile: ((String) -> Void)?
+
+    /// Collect-mode (multi-file review) toggle + state.
+    var onToggleCollect: (() -> Void)?
+    var isCollectingOn: () -> Bool = { false }
+
     private var statusItem: NSStatusItem?
     private let modelMenu = NSMenu()
     private let speedMenu = NSMenu()
     private let codeMenu = NSMenu()
+    private let profileMenu = NSMenu()
     private weak var autoItem: NSMenuItem?
+    private weak var collectItem: NSMenuItem?
 
     func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -53,11 +63,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         auto.state = isAutoReadOn() ? .on : .off
         menu.addItem(auto)
         autoItem = auto
+        let collect = NSMenuItem(title: "Collect snippets (multi-file)", action: #selector(toggleCollect), keyEquivalent: "")
+        collect.target = self
+        collect.state = isCollectingOn() ? .on : .off
+        menu.addItem(collect)
+        collectItem = collect
         menu.addItem(withTitle: "Listen  (⌥L)", action: #selector(listen), keyEquivalent: "").target = self
 
         let modelItem = NSMenuItem(title: "Model", action: nil, keyEquivalent: "")
         modelItem.submenu = modelMenu
         menu.addItem(modelItem)
+
+        let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
+        profileItem.submenu = profileMenu
+        profileMenu.delegate = self
+        menu.addItem(profileItem)
 
         let speedItem = NSMenuItem(title: "Speed  (⌥⇧S)", action: nil, keyEquivalent: "")
         speedItem.submenu = speedMenu
@@ -85,10 +105,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         rebuildProviderMenu()
         rebuildSpeedMenu()
         rebuildCodeMenu()
+        rebuildProfileMenu()
     }
 
-    func rebuildSpeedMenu() { fill(speedMenu, from: modeList(), action: #selector(selectMode(_:))) }
-    func rebuildCodeMenu()  { fill(codeMenu, from: codeList(), action: #selector(selectCode(_:))) }
+    func rebuildSpeedMenu()   { fill(speedMenu, from: modeList(), action: #selector(selectMode(_:))) }
+    func rebuildCodeMenu()    { fill(codeMenu, from: codeList(), action: #selector(selectCode(_:))) }
+    func rebuildProfileMenu() { fill(profileMenu, from: profileList(), action: #selector(selectProfile(_:))) }
 
     private func fill(_ menu: NSMenu, from rows: [(id: String, name: String, active: Bool)], action: Selector) {
         menu.removeAllItems()
@@ -111,7 +133,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === speedMenu { rebuildSpeedMenu() }
         else if menu === codeMenu { rebuildCodeMenu() }
-        else { autoItem?.state = isAutoReadOn() ? .on : .off }
+        else if menu === profileMenu { rebuildProfileMenu() }
+        else {   // the top menu
+            autoItem?.state = isAutoReadOn() ? .on : .off
+            collectItem?.state = isCollectingOn() ? .on : .off
+        }
     }
 
     func rebuildProviderMenu() {
@@ -150,6 +176,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func readScreen() { onReadScreen?() }
     @objc private func seeScreen() { onSeeScreen?() }
     @objc private func autoRead() { onAutoRead?() }
+    @objc private func toggleCollect() { onToggleCollect?() }
     @objc private func setRegion() { onSetRegion?() }
     @objc private func clearRegion() { onClearRegion?() }
     @objc private func listen() { onListen?() }
@@ -173,5 +200,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let id = sender.representedObject as? String else { return }
         onSelectCode?(id)
         rebuildCodeMenu()
+    }
+    @objc private func selectProfile(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onSelectProfile?(id)
+        rebuildProfileMenu()
     }
 }

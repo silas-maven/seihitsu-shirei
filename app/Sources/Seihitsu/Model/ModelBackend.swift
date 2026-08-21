@@ -26,14 +26,16 @@ struct Prompt {
     /// A bare question (no attachments) passes through unchanged.
     func wireText() -> String {
         guard !attachments.isEmpty else { return text }
+        let multi = attachments.count > 1   // numbered when it's a collect buffer of several snippets
         var parts: [String] = []
-        for a in attachments {
+        for (i, a) in attachments.enumerated() {
             let src = a.source.map { " from \($0)" } ?? ""
+            let n = multi ? " \(i + 1)" : ""
             let header: String
             switch a.kind {
-            case .code:       header = "Highlighted code\(src):"
-            case .screenText: header = "Text read from the screen\(src):"
-            case .selection:  header = "Highlighted text\(src):"
+            case .code:       header = "Code snippet\(n)\(src):"
+            case .screenText: header = "Text read from the screen\(n)\(src):"
+            case .selection:  header = "Highlighted text\(n)\(src):"
             }
             parts.append("\(header)\n\"\"\"\n\(a.content)\n\"\"\"")
         }

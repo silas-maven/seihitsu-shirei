@@ -10,6 +10,9 @@ struct HUDView: View {
         VStack(alignment: .leading, spacing: 10) {
             promptRow
             actionRow
+            if !vm.collected.isEmpty {
+                CollectionChip(count: vm.collected.count, accent: accent) { vm.clearCollected() }
+            }
             if let ctx = vm.context { ContextChip(attachment: ctx, accent: accent) { vm.clearContext() } }
             Divider().overlay(Color.white.opacity(0.12))
             answerHeader
@@ -35,6 +38,19 @@ struct HUDView: View {
         .foregroundStyle(.white)
         .onAppear { promptFocused = true }
         .onChange(of: vm.focusPulse) { _, _ in promptFocused = true }
+    }
+
+    /// HUD see-through. Sets the window alpha; lower is more transparent.
+    private var opacityControl: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "circle.lefthalf.filled")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.4))
+            Slider(value: $vm.opacity, in: 0.25...1.0)
+                .frame(width: 82)
+                .controlSize(.mini)
+        }
+        .help("HUD opacity")
     }
 
     private var promptRow: some View {
@@ -70,6 +86,10 @@ struct HUDView: View {
             }
             .foregroundStyle(vm.isListening ? Color.red : accent)
             Spacer()
+            if vm.collecting {
+                Circle().fill(Color.orange).frame(width: 7, height: 7)
+                Text("COLLECT \(vm.collected.count)").foregroundStyle(.orange.opacity(0.95)).tracking(0.5)
+            }
             if vm.autoReading {
                 Circle().fill(accent).frame(width: 7, height: 7)
                 Text("AUTO").foregroundStyle(accent.opacity(0.9)).tracking(0.5)
@@ -108,10 +128,11 @@ struct HUDView: View {
     }
 
     private var answerHeader: some View {
-        HStack {
+        HStack(spacing: 10) {
             Text("ANSWER").font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.35)).tracking(1.2)
             Spacer()
+            opacityControl
             if !vm.answer.isEmpty {
                 Button { vm.copyAnswer() } label: {
                     Label("Copy", systemImage: "doc.on.doc").font(.system(size: 10, design: .monospaced))
@@ -138,12 +159,17 @@ struct HUDView: View {
                 Text(vm.modelName).foregroundStyle(accent.opacity(0.8))
                 Text("·").foregroundStyle(.white.opacity(0.25))
             }
+            if vm.profile != .standard {
+                Text(vm.profile.label).foregroundStyle(accent.opacity(0.7))
+                Text("·").foregroundStyle(.white.opacity(0.25))
+            }
             Text(vm.statusLine).lineLimit(1)
             Spacer()
-            Text(vm.clickThrough ? "click-through ON" : "⌥Space · ⌥C · ⌥V · ⌥L")
+            if vm.clickThrough { Text("click-through ON") }
         }
         .font(.system(size: 10, design: .monospaced))
         .foregroundStyle(.white.opacity(0.5))
+        .padding(.trailing, 22)   // leave the corner clear for the resize grip
     }
 }
 
@@ -184,5 +210,33 @@ private struct ContextChip: View {
         .padding(.vertical, 7)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(accent.opacity(0.25), lineWidth: 1))
+    }
+}
+
+/// A pill showing how many snippets are gathered in the collect buffer (multi-file review).
+private struct CollectionChip: View {
+    let count: Int
+    let accent: Color
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.stack.3d.up").foregroundStyle(.orange)
+            Text("Collecting \(count) snippet\(count == 1 ? "" : "s")")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.85))
+            Text("type a question to ask across them")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+            Spacer()
+            Button(action: onClear) {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.white.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.orange.opacity(0.3), lineWidth: 1))
     }
 }
