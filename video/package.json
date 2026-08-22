@@ -1,0 +1,27 @@
+{
+  "name": "seihitsu-user-guide",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Source-faithful Remotion user guide and product demo for Seihitsu Shirei.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "voiceover": "node --env-file=../.env --strip-types generate-voiceover.ts",
+    "typecheck": "tsc --noEmit",
+    "still": "remotion still src/index.ts SeihitsuUserGuide out/preview.png --frame=930",
+    "render": "remotion render src/index.ts SeihitsuUserGuide out/seihitsu-user-guide.mp4 --codec=h264 --crf=18"
+  },
+  "dependencies": {
+    "@remotion/cli": "latest",
+    "@remotion/media": "4.0.514",
+    "@remotion/transitions": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "remotion": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "voice": "Verity X – Calm British Narration",
+  "voiceId": "1hlpeD1ydbI2ow0Tt3EW",
+  "model": "eleven_v3",
+  "scenes": [
+    {
+      "id": "01-intro",
+      "file": "01-intro.mp3",
+      "text": "This is Seihitsu Shirei—quiet AI help that stays beside your work, instead of pulling you into another app.",
+      "bytes": 122506
+    },
+    {
+      "id": "02-setup",
+      "file": "02-setup.mp3",
+      "text": "Start from the brain icon in your menu bar. Open Settings, add the key for your chosen AI provider, then allow only the features you want to use.",
+      "bytes": 183946
+    },
+    {
+      "id": "03-ask",
+      "file": "03-ask.mp3",
+      "text": "Press Option-Space to open the panel, type your question, and press Return. The answer appears right there in the floating window.",
+      "bytes": 142986
+    },
+    {
+      "id": "04-highlight",
+      "file": "04-highlight.mp3",
+      "text": "For a faster answer, highlight a question in any app and press Option-C. Seihitsu reads the selection and answers it automatically.",
+      "bytes": 167645
+    },
+    {
+      "id": "05-read-screen",
+      "file": "05-read-screen.mp3",
+      "text": "If the text cannot be selected, choose Set screen region from the brain menu and draw around it. After that, Option-V reads the area and answers the question.",
+      "bytes": 191887
+    },
+    {
+      "id": "06-voice",
+      "file": "06-voice.mp3",
+      "text": "You can also press Option-L and speak naturally. Your words appear in the prompt, and Seihitsu sends the question when you finish.",
+      "bytes": 147165
+    },
+    {
+      "id": "07-speed",
+      "file": "07-speed.mp3",
+      "text": "Choose Full for detail, Brief for one or two lines, or Blitz when time is short and you only need the answer.",
+      "bytes": 130447
+    },
+    {
+      "id": "08-privacy",
+      "file": "08-privacy.mp3",
+      "text": "The floating H U D is left out of ordinary screenshots and screen shares wherever macOS supports it. Screen text is recognised on your Mac, and only that text goes to your chosen AI provider.",
+      "bytes": 242878
+    },
+    {
+      "id": "09-recap",
+      "file": "09-recap.mp3",
+      "text": "Remember four shortcuts: Option-Space, Option-C, Option-V, and Option-L. Everything else remains available from the brain icon.",
+      "bytes": 199410
+    }
+  ]
+}

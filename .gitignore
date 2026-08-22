@@ -11,3 +11,7 @@ captures/
 
 # macOS
 .DS_Store
+
+# Local credentials
+.env
+.env.local

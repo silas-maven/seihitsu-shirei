@@ -12,6 +12,14 @@ never opened Terminal before. Follow it top to bottom.
 
 ---
 
+## Watch the user guide
+
+[![Watch the Seihitsu Shirei user guide](docs/media/seihitsu-user-guide-preview.gif)](docs/media/seihitsu-user-guide.mp4)
+
+**Click the preview to watch the complete narrated guide and product demonstration.**
+
+---
+
 ## What it can do
 
 - **Answer a question you highlight.** Select some text in any app, press a key, get an answer. No copy and paste.
